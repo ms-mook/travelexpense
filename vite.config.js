@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // รองรับชื่อตัวแปรที่ Supabase Integration ของ Vercel สร้างให้ (NEXT_PUBLIC_*) ด้วย
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [
     react(),
     VitePWA({
