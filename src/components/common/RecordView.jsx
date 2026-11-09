@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { ReceiptButton } from '../forms';
-import RouteMap, { tripsToPoints } from '../map/RouteMap';
+import { tripsToPoints } from '../map/routePoints';
+
+const RouteMap = lazy(() => import('../map/RouteMap'));
 import { StatusBadge } from './index';
 import { km, money, thaiDate, thaiDateTime } from '../../utils/format';
 import { EXPENSE_TYPE_LABEL, RECEIPT_LABEL, REIMBURSE_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/labels';
@@ -59,7 +61,11 @@ export default function RecordView({ detail, tripActions, expenseActions, tripFo
         {record.verified_at && <p className="mt-2 text-xs text-emerald-700">ยืนยันเมื่อ {thaiDateTime(record.verified_at)}</p>}
       </div>
 
-      {routes.length > 0 && <RouteMap routes={routes} height={220} />}
+      {routes.length > 0 && (
+        <Suspense fallback={<div className="h-[220px] animate-pulse rounded-2xl bg-slate-100" />}>
+          <RouteMap routes={routes} height={220} />
+        </Suspense>
+      )}
 
       {trips.map((t) => (
         <div key={t.trip_id} className="card">

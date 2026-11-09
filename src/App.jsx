@@ -1,4 +1,6 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { Spinner } from './components/common';
 import { AdminLayout, AuthLayout, EmployeeLayout, RequireRole, SecretaryLayout } from './layouts';
 import LoginPage from './pages/auth/LoginPage';
 import HomePage from './pages/employee/HomePage';
@@ -6,19 +8,22 @@ import TripsPage from './pages/employee/TripsPage';
 import RecordDetailPage from './pages/employee/RecordDetailPage';
 import MonthlyExpensePage from './pages/employee/MonthlyExpensePage';
 import ProfilePage from './pages/employee/ProfilePage';
-import RecordsPage from './pages/secretary/RecordsPage';
-import ReviewPage from './pages/secretary/ReviewPage';
-import MonthlyReviewPage from './pages/secretary/MonthlyReviewPage';
-import AuditPage from './pages/secretary/AuditPage';
-import DashboardPage from './pages/management/DashboardPage';
-import UsersPage from './pages/admin/UsersPage';
-import BasesPage from './pages/admin/BasesPage';
-import PoliciesPage from './pages/admin/PoliciesPage';
-import SettingsPage from './pages/admin/SettingsPage';
-import MonitorPage from './pages/monitor/MonitorPage';
+
+// หน้า Secretary / Management / Admin โหลดแยก — มือถือพนักงานไม่ต้องดาวน์โหลดส่วนนี้
+const RecordsPage = lazy(() => import('./pages/secretary/RecordsPage'));
+const ReviewPage = lazy(() => import('./pages/secretary/ReviewPage'));
+const MonthlyReviewPage = lazy(() => import('./pages/secretary/MonthlyReviewPage'));
+const AuditPage = lazy(() => import('./pages/secretary/AuditPage'));
+const DashboardPage = lazy(() => import('./pages/management/DashboardPage'));
+const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
+const BasesPage = lazy(() => import('./pages/admin/BasesPage'));
+const PoliciesPage = lazy(() => import('./pages/admin/PoliciesPage'));
+const SettingsPage = lazy(() => import('./pages/admin/SettingsPage'));
+const MonitorPage = lazy(() => import('./pages/monitor/MonitorPage'));
 
 export default function App() {
   return (
+    <Suspense fallback={<Spinner />}>
     <Routes>
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
@@ -56,5 +61,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
