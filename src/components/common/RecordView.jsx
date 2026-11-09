@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { ReceiptButton } from '../forms';
+import RouteMap, { tripsToPoints } from '../map/RouteMap';
 import { StatusBadge } from './index';
 import { km, money, thaiDate, thaiDateTime } from '../../utils/format';
 import { EXPENSE_TYPE_LABEL, RECEIPT_LABEL, REIMBURSE_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/labels';
@@ -30,6 +32,10 @@ function DistanceCheck({ trip }) {
  */
 export default function RecordView({ detail, tripActions, expenseActions, tripFooter }) {
   const { record, trips, summary } = detail;
+  const routes = useMemo(() => {
+    const points = tripsToPoints(trips);
+    return points.length ? [{ id: record.daily_record_id, color: '#0f766e', label: record.employee_name || 'เส้นทางวันนี้', points }] : [];
+  }, [trips, record.daily_record_id, record.employee_name]);
   return (
     <div className="space-y-3">
       <div className="card">
@@ -52,6 +58,8 @@ export default function RecordView({ detail, tripActions, expenseActions, tripFo
         {record.secretary_note && <p className="mt-2 rounded-lg bg-rose-50 p-2 text-sm text-rose-700">Secretary: {record.secretary_note}</p>}
         {record.verified_at && <p className="mt-2 text-xs text-emerald-700">ยืนยันเมื่อ {thaiDateTime(record.verified_at)}</p>}
       </div>
+
+      {routes.length > 0 && <RouteMap routes={routes} height={220} />}
 
       {trips.map((t) => (
         <div key={t.trip_id} className="card">

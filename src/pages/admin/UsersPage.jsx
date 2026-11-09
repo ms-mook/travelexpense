@@ -5,6 +5,11 @@ import { adminService } from '../../services';
 import { thaiDate, today } from '../../utils/format';
 import { ROLE_LABEL } from '../../utils/labels';
 
+const ROLE_CHIP = {
+  EMPLOYEE: 'bg-sky-50 text-sky-700', SECRETARY: 'bg-violet-50 text-violet-700',
+  MANAGEMENT: 'bg-amber-50 text-amber-800', SUPER_ADMIN: 'bg-slate-900 text-white'
+};
+
 const form = (e) => Object.fromEntries([...new FormData(e.currentTarget).entries()].filter(([, v]) => v !== ''));
 
 export default function UsersPage() {
@@ -55,11 +60,16 @@ export default function UsersPage() {
             <tbody>
               {list.map((u) => (
                 <tr key={u.employee_id} className={u.status === 'SUSPENDED' ? 'opacity-50' : ''}>
-                  <td>{u.full_name}<br /><span className="text-xs text-slate-400">{u.employee_code} · {u.position}</span></td>
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-800">{String(u.full_name || '?').slice(0, 1).toUpperCase()}</span>
+                      <div><p className="font-semibold text-slate-800">{u.full_name}</p><p className="text-xs text-slate-400">{[u.employee_code, u.position].filter(Boolean).join(' · ')}</p></div>
+                    </div>
+                  </td>
                   <td className="font-mono text-xs">{u.username || '-'}</td>
-                  <td>{ROLE_LABEL[u.role]}{u.role === 'SECRETARY' && <p className="text-xs text-slate-400">scope: {u.team_scope === 'ALL' ? 'ALL' : String(u.team_scope).split(',').filter(Boolean).map(baseName).join(', ') || '-'}</p>}</td>
+                  <td><span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_CHIP[u.role] || ''}`}>{ROLE_LABEL[u.role]}</span>{u.role === 'SECRETARY' && <p className="text-xs text-slate-400">scope: {u.team_scope === 'ALL' ? 'ALL' : String(u.team_scope).split(',').filter(Boolean).map(baseName).join(', ') || '-'}</p>}</td>
                   <td>{u.base_name || '-'}</td>
-                  <td>{u.status}</td>
+                  <td><span className={`inline-flex items-center gap-1.5 text-xs ${u.status === 'ACTIVE' ? 'text-emerald-700' : 'text-slate-400'}`}><span className={`h-2 w-2 rounded-full ${u.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'}`} />{u.status === 'ACTIVE' ? 'ใช้งาน' : 'ระงับ'}</span></td>
                   <td className="whitespace-nowrap">
                     <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => open('edit', u)}>แก้ไข</button>
                     <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => open('base', u)}>ย้าย Base</button>

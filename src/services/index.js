@@ -7,6 +7,15 @@ export const authService = {
   bases: () => api('/bases')
 };
 
+export const monitorService = {
+  day: (q) => api(`/monitor/day${qs(q)}`)
+};
+
+export const geoService = {
+  reverse: (lat, lng) => api(`/geo/reverse${qs({ lat, lng })}`),
+  recentPlaces: () => api('/me/recent-places')
+};
+
 export const mapsService = {
   distance: (origin, destination, province) => api(`/maps/distance${qs({ origin, destination, province })}`)
 };

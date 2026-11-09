@@ -15,6 +15,7 @@ import UsersPage from './pages/admin/UsersPage';
 import BasesPage from './pages/admin/BasesPage';
 import PoliciesPage from './pages/admin/PoliciesPage';
 import SettingsPage from './pages/admin/SettingsPage';
+import MonitorPage from './pages/monitor/MonitorPage';
 
 export default function App() {
   return (
@@ -37,10 +38,12 @@ export default function App() {
         <Route path="review/:id" element={<ReviewPage />} />
         <Route path="monthly" element={<MonthlyReviewPage />} />
         <Route path="audit" element={<AuditPage />} />
+        <Route path="monitor" element={<MonitorPage />} />
       </Route>
 
       <Route element={<RequireRole roles={['MANAGEMENT', 'SUPER_ADMIN']}><AdminLayout /></RequireRole>}>
         <Route path="management" element={<DashboardPage />} />
+        <Route path="management/monitor" element={<MonitorPage />} />
       </Route>
 
       <Route path="admin" element={<RequireRole roles={['SUPER_ADMIN']}><AdminLayout /></RequireRole>}>

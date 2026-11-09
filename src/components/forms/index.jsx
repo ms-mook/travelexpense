@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useAsync } from '../../hooks/useAsync';
 import { ErrorBanner, Field } from '../common';
 import { useAction } from '../../hooks/useAsync';
-import { expenseService, mapsService } from '../../services';
+import { expenseService, geoService, mapsService } from '../../services';
 import { JOB_TYPES, PROVINCES, classifyTravelType, googleMapsDirUrl, parseProvinces } from '../../../shared/provinces';
 import { compressImage, fileToBase64 } from '../../utils/format';
 import { EXPENSE_TYPE_LABEL, FUEL_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/labels';
@@ -43,8 +44,40 @@ export function TripForm({ vehicles, initial = {}, defaultOrigin = '', homeLocat
   const [originHome, setOriginHome] = useState(startFromHome);
   const [destHome, setDestHome] = useState(isTrue(initial.destination_is_home));
   const [origin, setOrigin] = useState(initial.origin ?? (startFromHome ? homeLocation : defaultOrigin));
-  const [destination, setDestination] = useState(initial.destination || '');
+  const [destination, setDestinationRaw] = useState(initial.destination || '');
   const [province, setProvince] = useState(initial.destination_province || '');
+  const [customer, setCustomer] = useState(initial.customer_name || '');
+  const [destCoord, setDestCoord] = useState(null); // { lat, lng } จาก GPS หรือชิปสถานที่
+  const places = useAsync(() => (initial.trip_id ? Promise.resolve([]) : geoService.recentPlaces().catch(() => [])), []);
+  const gps = useAction();
+  // พิมพ์ปลายทางเอง → ล้างพิกัดเดิม ให้ระบบหาพิกัดใหม่จากชื่อ
+  const setDestination = (v) => { setDestinationRaw(v); setDestCoord(null); };
+
+  function pickPlace(p) {
+    setDestinationRaw(p.destination);
+    if (p.destination_province) setProvince(p.destination_province);
+    if (p.customer_name) setCustomer(p.customer_name);
+    setDestCoord(p.dest_lat !== null && p.dest_lng !== null ? { lat: p.dest_lat, lng: p.dest_lng } : null);
+    setDestHome(false);
+  }
+
+  function useMyLocation() {
+    gps.run(() => new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง'));
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = Math.round(pos.coords.latitude * 1e6) / 1e6;
+        const lng = Math.round(pos.coords.longitude * 1e6) / 1e6;
+        setDestCoord({ lat, lng });
+        try {
+          const r = await geoService.reverse(lat, lng);
+          if (r?.province) setProvince(r.province);
+          if (r?.name) setDestinationRaw((d) => d || r.name);
+        } catch { /* ใช้พิกัดได้แม้หาชื่อไม่เจอ */ }
+        resolve(true);
+      }, () => reject(new Error('ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง — เปิดสิทธิ์ Location ของเบราว์เซอร์ หรือพิมพ์ปลายทางเอง')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    }));
+  }
   const [distance, setDistance] = useState(initial.distance_km ?? '');
   const [manualType, setManualType] = useState(initial.travel_type || 'BASE');
   const maps = useAction();
@@ -80,9 +113,31 @@ export function TripForm({ vehicles, initial = {}, defaultOrigin = '', homeLocat
         <Field label="ต้นทาง">
           <input name="origin" className="input" required maxLength={200} value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="เช่น สำนักงาน Sysmex ขอนแก่น" />
         </Field>
+        {places.data?.length > 0 && (
+          <div>
+            <p className="label">ไปบ่อย — แตะเพื่อเลือก</p>
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {places.data.map((p) => (
+                <button key={`${p.destination}|${p.destination_province}`} type="button" onClick={() => pickPlace(p)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs ring-1 transition ${destination === p.destination ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white text-slate-700 ring-slate-300 hover:ring-brand-400'}`}>
+                  {p.destination}{p.destination_province && <span className="opacity-60"> · {p.destination_province}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <Field label="ปลายทาง (ชื่อสถานที่)">
-          <input name="destination" className="input" required maxLength={200} value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="เช่น โรงพยาบาลศรีนครินทร์" />
+          <div className="flex gap-2">
+            <input name="destination" className="input" required maxLength={200} value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="เช่น โรงพยาบาลศรีนครินทร์" />
+            <button type="button" onClick={useMyLocation} disabled={gps.busy} title="ใช้ตำแหน่งปัจจุบันเป็นปลายทาง"
+              className={`shrink-0 rounded-xl px-3 text-lg ring-1 ${destCoord ? 'bg-emerald-50 ring-emerald-300' : 'bg-white ring-slate-300'}`}>
+              {gps.busy ? '…' : '📍'}
+            </button>
+          </div>
         </Field>
+        {destCoord && <p className="-mt-2 text-xs text-emerald-700">📍 ปักหมุดตำแหน่งแล้ว — จะแสดงบนแผนที่</p>}
+        <ErrorBanner message={gps.error} />
+        {destCoord && <><input type="hidden" name="dest_lat" value={destCoord.lat} /><input type="hidden" name="dest_lng" value={destCoord.lng} /></>}
         <Field label="จังหวัดปลายทาง">
           <select name="destination_province" className="input" required={hasBaseProvinces} value={province} onChange={(e) => setProvince(e.target.value)}>
             <option value="">— เลือกจังหวัด —</option>
@@ -111,7 +166,7 @@ export function TripForm({ vehicles, initial = {}, defaultOrigin = '', homeLocat
 
       <Section n="2" title="ไปทำอะไร" hint="ใช้วิเคราะห์ต้นทุนต่องานและต่อลูกค้า (ไม่บังคับ แต่แนะนำให้กรอก)">
         <Field label="ลูกค้า / หน่วยงาน">
-          <input name="customer_name" className="input" maxLength={200} defaultValue={initial.customer_name} placeholder="เช่น รพ.ขอนแก่น — ห้องแล็บ" />
+          <input name="customer_name" className="input" maxLength={200} value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="เช่น รพ.ขอนแก่น — ห้องแล็บ" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="ประเภทงาน">

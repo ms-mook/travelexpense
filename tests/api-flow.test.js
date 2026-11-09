@@ -3,6 +3,7 @@
  * ครอบคลุม: RBAC, Ownership, Base scope, Workflow, ล็อก VERIFIED, Audit Log, Soft delete, รายงาน
  */
 import test from 'node:test';
+process.env.GEOCODING_DISABLED = 'true';
 import assert from 'node:assert/strict';
 import { handle } from '../server/app.js';
 import { setDb } from '../server/db/index.js';
@@ -158,4 +159,18 @@ test('Monthly actual: Backend คำนวณ actual_total เอง แล้�
   const csv = await call('mgmt', 'GET', '/management/export?month=2026-10');
   assert.equal(csv.status, 200);
   assert.ok(String(csv.json).includes('expense_gap'));
+});
+
+test('Monitor รายวัน: Management เห็นเส้นทาง, Secretary เห็นเฉพาะ Base ตัวเอง, Employee เรียกไม่ได้', async () => {
+  const m = await call('mgmt', 'GET', '/monitor/day?date=2026-10-15');
+  assert.equal(m.status, 200);
+  const e1 = m.json.data.employees.find((e) => e.employee_id === 'emp1');
+  assert.equal(e1.trips.length, 2);
+  assert.equal(e1.status, 'VERIFIED');
+  assert.equal(m.json.data.employees.find((e) => e.employee_id === 'emp2').status, 'NOT_RECORDED');
+  const k = await call('sec-kkn', 'GET', '/monitor/day?date=2026-10-15');
+  assert.equal(k.json.data.employees.length, 0);
+  assert.equal((await call('emp1', 'GET', '/monitor/day')).status, 403);
+  const places = await call('emp1', 'GET', '/me/recent-places');
+  assert.equal(places.status, 200);
 });

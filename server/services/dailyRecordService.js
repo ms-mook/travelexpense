@@ -11,6 +11,41 @@ import { writeAudit } from './auditService.js';
 import { assertReceiptOwnedBy } from './receiptService.js';
 import { fuelLabel } from './vehicleService.js';
 import { drivingDistanceKm } from './mapsService.js';
+import { blurCoord, geocode } from './geoService.js';
+
+const hasCoord = (lat, lng) => lat !== '' && lat !== undefined && lat !== null && lng !== '' && lng !== undefined && lng !== null;
+
+/**
+ * เติมพิกัดต้นทาง/ปลายทางสำหรับแผนที่ (best-effort)
+ * - ใช้พิกัดจาก GPS ของมือถือถ้าส่งมา
+ * - ต้นทางที่ตรงกับปลายทางเที่ยวก่อน → ใช้พิกัดเดิม (ไม่เรียก API ซ้ำ)
+ * - จุดที่เป็นบ้าน → ปัดพิกัดให้หยาบ (~1 กม.)
+ */
+async function fillCoords(t, prevTrip, homeText) {
+  const out = {};
+  const originHome = toBool(t.origin_is_home);
+  const destHome = toBool(t.destination_is_home);
+  const tasks = [];
+  if (!hasCoord(t.origin_lat, t.origin_lng)) {
+    if (prevTrip && prevTrip.destination === t.origin && hasCoord(prevTrip.dest_lat, prevTrip.dest_lng)) {
+      out.origin_lat = prevTrip.dest_lat; out.origin_lng = prevTrip.dest_lng;
+    } else {
+      tasks.push(geocode(originHome && homeText ? homeText : t.origin, originHome ? '' : t.destination_province)
+        .then((g) => { if (g) { out.origin_lat = g.lat; out.origin_lng = g.lng; } }));
+    }
+  }
+  if (!hasCoord(t.dest_lat, t.dest_lng)) {
+    tasks.push(geocode(destHome && homeText ? homeText : t.destination, t.destination_province)
+      .then((g) => { if (g) { out.dest_lat = g.lat; out.dest_lng = g.lng; } }));
+  }
+  await Promise.all(tasks);
+  const r = { ...t, ...out };
+  if (originHome) { r.origin_lat = blurCoord(r.origin_lat); r.origin_lng = blurCoord(r.origin_lng); }
+  if (destHome) { r.dest_lat = blurCoord(r.dest_lat); r.dest_lng = blurCoord(r.dest_lng); }
+  return {
+    origin_lat: r.origin_lat ?? '', origin_lng: r.origin_lng ?? '', dest_lat: r.dest_lat ?? '', dest_lng: r.dest_lng ?? ''
+  };
+}
 import { classifyTravelType } from '../../shared/provinces.js';
 
 /**
@@ -164,7 +199,10 @@ export async function addTrip(ctx, recordId, input) {
     travel_type: await resolveTravelType(record, input.destination_province, input.travel_type),
     distance_km: round2(input.distance_km), sequence_no: seq, created_at: ts, updated_at: ts, is_deleted: false
   };
-  row.maps_distance_km = await mapsDistance(row);
+  const prev = trips.filter((x) => !toBool(x.is_deleted)).sort((a, b) => Number(b.sequence_no) - Number(a.sequence_no))[0];
+  const [mapsKm, coords] = await Promise.all([mapsDistance(row), fillCoords(row, prev, ctx.user.home_location)]);
+  row.maps_distance_km = mapsKm;
+  Object.assign(row, coords);
   await db.insert('trips', row);
   await touchRecord(recordId);
   return row;
@@ -190,7 +228,15 @@ export async function updateTrip(ctx, tripId, patch) {
     data.travel_type = await resolveTravelType(record, merged.destination_province, merged.travel_type);
   }
   if (['origin', 'destination', 'destination_province'].some((k) => data[k] !== undefined && data[k] !== t[k])) {
-    data.maps_distance_km = await mapsDistance(merged);
+    const placeChanged = { ...merged };
+    // ที่อยู่เปลี่ยนแต่ไม่ได้ส่งพิกัดใหม่ → คำนวณพิกัดใหม่
+    if (data.origin !== undefined && data.origin !== t.origin && data.origin_lat === undefined) { placeChanged.origin_lat = ''; placeChanged.origin_lng = ''; }
+    if ((data.destination !== undefined && data.destination !== t.destination) || data.destination_province !== undefined) {
+      if (data.dest_lat === undefined) { placeChanged.dest_lat = ''; placeChanged.dest_lng = ''; }
+    }
+    const [mapsKm, coords] = await Promise.all([mapsDistance(merged), fillCoords(placeChanged, null, ctx.user.home_location)]);
+    data.maps_distance_km = mapsKm;
+    Object.assign(data, coords);
   }
   const row = await getDb().update('trips', tripId, { ...data, updated_at: nowIso() }, { expectedUpdatedAt: expected });
   await touchRecord(t.daily_record_id);

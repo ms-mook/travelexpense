@@ -28,11 +28,11 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-sm">
       <div className="mb-6 text-center">
-        <img src="/icon.svg" alt="" className="mx-auto mb-3 h-16 w-16" />
-        <h1 className="text-2xl font-bold text-brand-800">Travel Expense</h1>
+        <img src="/icon.svg" alt="" className="mx-auto mb-3 h-20 w-20 rounded-3xl shadow-lg shadow-brand-900/20" />
+        <h1 className="text-2xl font-bold tracking-tight text-brand-900">Travel Expense</h1>
         <p className="text-sm text-slate-500">บันทึกการเดินทางและค่าใช้จ่าย Service Engineer</p>
       </div>
-      <form onSubmit={submit} className="card space-y-4 p-6">
+      <form onSubmit={submit} className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-xl shadow-slate-900/5 ring-1 ring-slate-200 backdrop-blur">
         <Field label="Username"><input name="username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="input" required /></Field>
         <Field label="รหัสผ่าน"><input name="password" type="password" autoComplete="current-password" className="input" required /></Field>
         <ErrorBanner message={error} />

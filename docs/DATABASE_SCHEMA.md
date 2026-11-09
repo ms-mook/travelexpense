@@ -127,6 +127,10 @@ Primary key: `trip_id`
 | `maps_distance_km` | เพิ่มจากแผน v1.0 |
 | `origin_is_home` | เพิ่มจากแผน v1.0 |
 | `destination_is_home` | เพิ่มจากแผน v1.0 |
+| `origin_lat` | เพิ่มจากแผน v1.0 |
+| `origin_lng` | เพิ่มจากแผน v1.0 |
+| `dest_lat` | เพิ่มจากแผน v1.0 |
+| `dest_lng` | เพิ่มจากแผน v1.0 |
 
 ## 07_expenses
 

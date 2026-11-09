@@ -40,13 +40,22 @@ export default function TripsPage() {
       <ul className="space-y-2">
         {data?.map((r) => (
           <li key={r.daily_record_id}>
-            <Link to={`/trips/${r.daily_record_id}`} className="card flex items-center justify-between gap-3 hover:ring-brand-300">
-              <div>
-                <p className="font-semibold">{thaiDate(r.record_date)}</p>
-                <p className="text-sm text-slate-500">{r.summary.trip_count} เที่ยว · {km(r.summary.total_km)} · {money(r.summary.expenses.total)}</p>
-                {r.status === 'RETURNED' && r.secretary_note && <p className="mt-1 text-xs text-rose-600">เหตุผล: {r.secretary_note}</p>}
+            <Link to={`/trips/${r.daily_record_id}`} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 transition hover:ring-brand-300 active:scale-[.99]">
+              <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-brand-50 text-brand-800">
+                <span className="text-xl font-bold leading-none">{Number(String(r.record_date).slice(8, 10))}</span>
+                <span className="text-[10px]">{new Date(`${r.record_date}T00:00:00`).toLocaleDateString('th-TH', { weekday: 'short' })}</span>
               </div>
-              <StatusBadge status={r.status} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold tabular-nums">{km(r.summary.total_km)}</p>
+                  <StatusBadge status={r.status} />
+                </div>
+                <p className="text-xs text-slate-500">{r.summary.trip_count} เที่ยว
+                  {r.summary.upcountry_km > 0 && <span className="text-amber-700"> · นอก Base {km(r.summary.upcountry_km)}</span>}
+                  {r.summary.expenses.total > 0 && ` · ${money(r.summary.expenses.total)}`}
+                </p>
+                {r.status === 'RETURNED' && r.secretary_note && <p className="mt-1 truncate text-xs text-rose-600">เหตุผล: {r.secretary_note}</p>}
+              </div>
             </Link>
           </li>
         ))}

@@ -30,10 +30,10 @@ export function StatusBadge({ status }) {
 
 export function PageHeader({ title, subtitle, action }) {
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 md:text-2xl">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -102,11 +102,16 @@ export function ReasonModal({ open, title, onClose, onConfirm, busy, error, conf
 }
 
 export function StatCard({ label, value, hint, tone = 'slate' }) {
-  const tones = { slate: 'text-slate-900', brand: 'text-brand-700', rose: 'text-rose-600', emerald: 'text-emerald-700', amber: 'text-amber-700' };
+  const tones = {
+    slate: ['text-slate-900', 'bg-slate-300'], brand: ['text-brand-700', 'bg-brand-500'], rose: ['text-rose-600', 'bg-rose-500'],
+    emerald: ['text-emerald-700', 'bg-emerald-500'], amber: ['text-amber-700', 'bg-amber-500']
+  };
+  const [text, bar] = tones[tone] || tones.slate;
   return (
-    <div className="card">
+    <div className="card relative overflow-hidden">
+      <span className={`absolute inset-y-0 left-0 w-1 ${bar}`} />
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-1 text-xl font-bold tabular-nums ${tones[tone]}`}>{value}</p>
+      <p className={`mt-1 text-xl font-bold tabular-nums ${text}`}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
     </div>
   );

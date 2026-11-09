@@ -18,6 +18,8 @@ import * as secretary from '../services/secretaryService.js';
 import * as settings from '../services/settingsService.js';
 import * as vehicles from '../services/vehicleService.js';
 import * as maps from '../services/mapsService.js';
+import * as geo from '../services/geoService.js';
+import * as monitor from '../services/monitorService.js';
 
 const { EMPLOYEE: E, SECRETARY: SEC, MANAGEMENT: M, SUPER_ADMIN: A } = ROLES;
 const ALL = [E, SEC, M, A];
@@ -43,6 +45,17 @@ export const routes = [
       scope: ctx.scope, features: { maps_distance: maps.mapsAvailable(), receipts: process.env.RECEIPTS_ENABLED === 'true' } };
   }],
   ['GET', '/bases', ALL, () => admin.listBases()],
+  ['GET', '/geo/reverse', ALL, async (ctx, { query }) => {
+    const lat = Number(query.lat); const lng = Number(query.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw badRequest('ต้องระบุ lat และ lng');
+    return (await geo.reverseGeocode(lat, lng)) || { province: null, name: '' };
+  }],
+  ['GET', '/me/recent-places', [E], (ctx) => monitor.recentPlaces(ctx)],
+  ['GET', '/monitor/day', [SEC, M, A], (ctx, { query }) => {
+    const date = query.date || todayTH();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw badRequest('date ต้องเป็น YYYY-MM-DD');
+    return monitor.dayMonitor(ctx, { date, baseId: query.base_id });
+  }],
   ['GET', '/maps/distance', ALL, async (ctx, { query }) => {
     if (!maps.mapsAvailable()) return { available: false, distance_km: null };
     if (!query.origin || !query.destination) throw badRequest('ต้องระบุ origin และ destination');
