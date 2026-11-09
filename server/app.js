@@ -19,6 +19,9 @@ export async function handle(req, res, path) {
     delete query.__path;
     const cleanPath = `/${String(path || '').replace(/^\/+|\/+$/g, '')}`;
 
+    // Health check (ไม่ต้อง login): ตรวจว่า env ครบและอ่าน Sheet ได้ — ไม่คืนข้อมูลใด ๆ
+    if (req.method === 'GET' && cleanPath === '/health') return sendJson(res, 200, await healthCheck());
+
     const { route, params, pathMatched } = matchRoute(req.method, cleanPath);
     if (!route) {
       throw new ApiError(pathMatched ? 405 : 404, pathMatched ? 'METHOD_NOT_ALLOWED' : 'NOT_FOUND', 'ไม่พบ API นี้');
@@ -53,4 +56,23 @@ export async function handle(req, res, path) {
     if (err instanceof SyntaxError) return sendError(res, new ApiError(400, 'INVALID_JSON', 'รูปแบบ JSON ไม่ถูกต้อง'));
     return sendError(res, err);
   }
+}
+
+async function healthCheck() {
+  const env = (k) => Boolean(process.env[k]);
+  const checks = {
+    supabase_env: env('SUPABASE_URL') && env('SUPABASE_SERVICE_ROLE_KEY'),
+    google_env: env('GOOGLE_SERVICE_ACCOUNT_EMAIL') && env('GOOGLE_PRIVATE_KEY') && env('GOOGLE_SHEETS_ID'),
+    receipt_folder_env: env('GOOGLE_DRIVE_RECEIPT_FOLDER_ID'),
+    sheets_read: false,
+    region: process.env.VERCEL_REGION || null
+  };
+  try {
+    const settings = await getDb().list('settings');
+    checks.sheets_read = settings.length > 0;
+  } catch (err) {
+    checks.sheets_error = String(err?.message || err).slice(0, 200);
+  }
+  checks.ok = checks.supabase_env && checks.google_env && checks.sheets_read;
+  return checks;
 }
