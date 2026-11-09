@@ -121,7 +121,7 @@ export default function RecordDetailPage() {
         )}
       </Modal>
       <Modal open={Boolean(expenseTrip)} title="เพิ่มค่าใช้จ่าย" onClose={() => setExpenseTrip(null)}>
-        {expenseTrip && <ExpenseForm travelType={expenseTrip.travel_type} onSubmit={saveExpense} onCancel={() => setExpenseTrip(null)} busy={act.busy} error={act.error} />}
+        {expenseTrip && <ExpenseForm travelType={expenseTrip.travel_type} receiptsEnabled={features.receipts} onSubmit={saveExpense} onCancel={() => setExpenseTrip(null)} busy={act.busy} error={act.error} />}
       </Modal>
     </div>
   );

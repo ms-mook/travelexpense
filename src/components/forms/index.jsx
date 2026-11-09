@@ -169,7 +169,7 @@ export function TripForm({ vehicles, initial = {}, defaultOrigin = '', homeLocat
   );
 }
 
-export function ExpenseForm({ travelType, onSubmit, onCancel, busy, error }) {
+export function ExpenseForm({ travelType, receiptsEnabled = false, onSubmit, onCancel, busy, error }) {
   const [receipt, setReceipt] = useState(null);
   const upload = useAction();
 
@@ -202,11 +202,15 @@ export function ExpenseForm({ travelType, onSubmit, onCancel, busy, error }) {
       <Field label="จำนวนเงิน (บาท)">
         <input name="amount" type="number" inputMode="decimal" step="0.01" min="0" className="input" required />
       </Field>
-      <Field label="ใบเสร็จ" hint="ถ่ายรูปหรือเลือกไฟล์ (JPG/PNG/PDF) — เก็บแบบ Private">
-        <input name="receipt" type="file" accept="image/*,application/pdf" capture="environment" className="block w-full text-sm" onChange={pickFile} disabled={upload.busy} />
-        {upload.busy && <span className="mt-1 block text-xs text-slate-500">กำลังอัปโหลด...</span>}
-        {receipt && <span className="mt-1 block text-xs text-emerald-700">✓ แนบ {receipt.receipt_name} แล้ว</span>}
-      </Field>
+      {receiptsEnabled ? (
+        <Field label="ใบเสร็จ" hint="ถ่ายรูปหรือเลือกไฟล์ (JPG/PNG/PDF) — เก็บแบบ Private">
+          <input name="receipt" type="file" accept="image/*,application/pdf" capture="environment" className="block w-full text-sm" onChange={pickFile} disabled={upload.busy} />
+          {upload.busy && <span className="mt-1 block text-xs text-slate-500">กำลังอัปโหลด...</span>}
+          {receipt && <span className="mt-1 block text-xs text-emerald-700">✓ แนบ {receipt.receipt_name} แล้ว</span>}
+        </Field>
+      ) : (
+        <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">📎 การแนบรูปใบเสร็จจะเปิดใช้เร็ว ๆ นี้ — ตอนนี้บันทึกยอดเงินไว้ก่อน แล้วเก็บใบเสร็จตัวจริงไว้</p>
+      )}
       <ErrorBanner message={upload.error} />
       <Field label="หมายเหตุ"><input name="note" className="input" maxLength={1000} /></Field>
       <ErrorBanner message={error} />

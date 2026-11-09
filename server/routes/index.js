@@ -40,7 +40,7 @@ export const routes = [
     const bases = await admin.listBases();
     const base = bases.find((b) => b.base_id === ctx.user.base_id);
     return { user: { ...publicUser(ctx.user), base_name: base?.base_name || '', base_provinces: base?.provinces || '' },
-      scope: ctx.scope, features: { maps_distance: maps.mapsAvailable() } };
+      scope: ctx.scope, features: { maps_distance: maps.mapsAvailable(), receipts: process.env.RECEIPTS_ENABLED === 'true' } };
   }],
   ['GET', '/bases', ALL, () => admin.listBases()],
   ['GET', '/maps/distance', ALL, async (ctx, { query }) => {
@@ -74,7 +74,10 @@ export const routes = [
   ['POST', '/trips/:id/expenses', [E], (ctx, { params, body }) => daily.addExpense(ctx, params.id, validate(S.expenseSchema, body))],
   ['DELETE', '/expenses/:id', [E], (ctx, { params }) => daily.deleteExpense(ctx, params.id)],
 
-  ['POST', '/receipts/upload', [E], (ctx, { body }) => receipts.uploadReceipt(ctx, validate(S.receiptUploadSchema, body))],
+  ['POST', '/receipts/upload', [E], (ctx, { body }) => {
+    if (process.env.RECEIPTS_ENABLED !== 'true') throw badRequest('ระบบแนบใบเสร็จยังไม่เปิดใช้งาน');
+    return receipts.uploadReceipt(ctx, validate(S.receiptUploadSchema, body));
+  }],
   ['GET', '/receipts/:fileId', ALL, async (ctx, { params, res }) => {
     await receipts.streamReceipt(ctx, params.fileId, res, { assertCanRead: daily.assertCanRead });
     return STREAMED;
