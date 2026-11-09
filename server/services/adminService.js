@@ -6,6 +6,15 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { inEffectiveRange, nowIso, todayTH, uuid } from '../lib/utils.js';
 import { isValidUsername, normalizeUsername, usernameToAuthEmail } from '../../shared/username.js';
 import { diff, writeAudit } from './auditService.js';
+import { PROVINCES, parseProvinces } from '../../shared/provinces.js';
+
+function normalizeProvinces(v) {
+  if (v === undefined) return undefined;
+  const list = [...new Set(parseProvinces(v))];
+  const bad = list.filter((p) => !PROVINCES.includes(p));
+  if (bad.length) throw badRequest(`ไม่รู้จักจังหวัด: ${bad.join(', ')}`);
+  return list.join(',');
+}
 
 /* ---------------- Users ---------------- */
 
@@ -123,7 +132,7 @@ export async function createBase(ctx, input) {
   const bases = await db.list('bases');
   if (bases.some((b) => b.base_code === input.base_code)) throw conflict('รหัส Base ซ้ำ');
   const ts = nowIso();
-  const base = { base_id: uuid(), ...input, created_at: ts, updated_at: ts };
+  const base = { base_id: uuid(), ...input, provinces: normalizeProvinces(input.provinces) || '', created_at: ts, updated_at: ts };
   await db.insert('bases', base);
   await writeAudit(ctx, { action: 'CREATE', entityType: 'BASE', entityId: base.base_id, newValue: base });
   return base;
@@ -133,7 +142,8 @@ export async function updateBase(ctx, baseId, patch) {
   const db = getDb();
   const before = await db.get('bases', baseId);
   if (!before) throw notFound();
-  const after = await db.update('bases', baseId, { ...patch, updated_at: nowIso() });
+  const provinces = normalizeProvinces(patch.provinces);
+  const after = await db.update('bases', baseId, { ...patch, ...(provinces !== undefined ? { provinces } : {}), updated_at: nowIso() });
   const { oldV, newV } = diff(before, after);
   await writeAudit(ctx, { action: 'UPDATE', entityType: 'BASE', entityId: baseId, oldValue: oldV, newValue: newV });
   return after;

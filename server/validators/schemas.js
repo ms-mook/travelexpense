@@ -1,3 +1,4 @@
+import { JOB_TYPES, PROVINCES } from '../../shared/provinces.js';
 import { ALLOWANCE_TYPES, EXPENSE_TYPES, FUEL_TYPES, REIMBURSEMENT_STATUS, ROLES, TRAVEL_TYPES } from '../db/schema.js';
 
 const money = { type: 'number', min: 0, max: 10_000_000, decimals: 2 };
@@ -18,9 +19,14 @@ export const dailyRecordSchema = {
 
 export const tripSchema = {
   vehicle_id: { type: 'uuid', required: true },
-  travel_type: { type: 'enum', values: TRAVEL_TYPES, required: true },
+  // travel_type คำนวณจากจังหวัดปลายทางเมื่อ Base ตั้งจังหวัดไว้ — ส่งมาเองได้เฉพาะ Base ที่ยังไม่ตั้งจังหวัด
+  travel_type: { type: 'enum', values: TRAVEL_TYPES },
   origin: { type: 'string', required: true, max: 200 },
   destination: { type: 'string', required: true, max: 200 },
+  destination_province: { type: 'enum', values: PROVINCES },
+  customer_name: { type: 'string', max: 200 },
+  job_type: { type: 'enum', values: Object.keys(JOB_TYPES) },
+  ticket_no: { type: 'string', max: 60 },
   distance_km: { type: 'number', required: true, min: 0, max: 5000, decimals: 2 },
   odometer_start: { type: 'number', min: 0, decimals: 1 },
   odometer_end: { type: 'number', min: 0, decimals: 1 },
@@ -85,6 +91,7 @@ export const baseSchema = {
   province: { type: 'string', max: 80 },
   district: { type: 'string', max: 80 },
   description: { type: 'string', max: 1000 },
+  provinces: { type: 'string', max: 2000 }, // จังหวัดที่นับเป็น BASE คั่นด้วย ,
   status: { type: 'enum', values: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' }
 };
 

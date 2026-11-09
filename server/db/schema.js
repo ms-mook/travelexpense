@@ -15,7 +15,7 @@ export const SHEETS = {
     name: '02_bases',
     key: 'base_id',
     columns: ['base_id', 'base_code', 'base_name', 'province', 'district', 'description', 'status',
-      'created_at', 'updated_at']
+      'created_at', 'updated_at', 'provinces']
   },
   baseAssignments: {
     name: '03_base_assignments',
@@ -40,7 +40,8 @@ export const SHEETS = {
     key: 'trip_id',
     columns: ['trip_id', 'daily_record_id', 'employee_id', 'vehicle_id', 'vehicle_model_snapshot',
       'license_plate_snapshot', 'fuel_type_snapshot', 'sequence_no', 'travel_type', 'origin', 'destination',
-      'distance_km', 'odometer_start', 'odometer_end', 'note', 'created_at', 'updated_at', 'is_deleted']
+      'distance_km', 'odometer_start', 'odometer_end', 'note', 'created_at', 'updated_at', 'is_deleted',
+      'destination_province', 'customer_name', 'job_type', 'ticket_no', 'maps_distance_km']
   },
   expenses: {
     name: '07_expenses',

@@ -16,6 +16,7 @@ import * as reports from '../services/reportService.js';
 import * as secretary from '../services/secretaryService.js';
 import * as settings from '../services/settingsService.js';
 import * as vehicles from '../services/vehicleService.js';
+import * as maps from '../services/mapsService.js';
 
 const { EMPLOYEE: E, SECRETARY: SEC, MANAGEMENT: M, SUPER_ADMIN: A } = ROLES;
 const ALL = [E, SEC, M, A];
@@ -35,10 +36,16 @@ export const routes = [
   /* ---------- Auth ---------- */
   ['GET', '/auth/me', ALL, async (ctx) => {
     const bases = await admin.listBases();
-    return { user: { ...publicUser(ctx.user), base_name: bases.find((b) => b.base_id === ctx.user.base_id)?.base_name || '' },
-      scope: ctx.scope };
+    const base = bases.find((b) => b.base_id === ctx.user.base_id);
+    return { user: { ...publicUser(ctx.user), base_name: base?.base_name || '', base_provinces: base?.provinces || '' },
+      scope: ctx.scope, features: { maps_distance: maps.mapsAvailable() } };
   }],
   ['GET', '/bases', ALL, () => admin.listBases()],
+  ['GET', '/maps/distance', ALL, async (ctx, { query }) => {
+    if (!maps.mapsAvailable()) return { available: false, distance_km: null };
+    if (!query.origin || !query.destination) throw badRequest('ต้องระบุ origin และ destination');
+    return { available: true, distance_km: await maps.drivingDistanceKm(query.origin, query.destination, query.province) };
+  }],
 
   /* ---------- Employee ---------- */
   ['GET', '/users/me', ALL, (ctx) => publicUser(ctx.user)],

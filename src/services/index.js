@@ -6,6 +6,10 @@ export const authService = {
   bases: () => api('/bases')
 };
 
+export const mapsService = {
+  distance: (origin, destination, province) => api(`/maps/distance${qs({ origin, destination, province })}`)
+};
+
 export const vehicleService = {
   list: (all = false) => api(`/vehicles${all ? '?all=1' : ''}`),
   create: (b) => api('/vehicles', { method: 'POST', body: b }),

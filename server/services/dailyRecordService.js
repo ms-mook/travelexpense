@@ -10,6 +10,27 @@ import { baseForDate } from './adminService.js';
 import { writeAudit } from './auditService.js';
 import { assertReceiptOwnedBy } from './receiptService.js';
 import { fuelLabel } from './vehicleService.js';
+import { drivingDistanceKm } from './mapsService.js';
+import { classifyTravelType } from '../../shared/provinces.js';
+
+/**
+ * ประเภทเที่ยวกำหนดจากจังหวัดปลายทางเทียบกับจังหวัดของ Base (snapshot ของ Daily Record)
+ * Base ที่ยังไม่ตั้งจังหวัด → ใช้ค่าที่ผู้ใช้เลือก (ต้องเลือก)
+ */
+export async function resolveTravelType(record, destinationProvince, requested) {
+  const base = record.base_id ? await getDb().get('bases', record.base_id) : null;
+  const auto = classifyTravelType(base?.provinces, destinationProvince);
+  if (auto) return auto;
+  if (base?.provinces && !destinationProvince) throw badRequest('กรุณาเลือกจังหวัดปลายทาง');
+  if (!requested) throw badRequest('กรุณาเลือกประเภทการเดินทาง (BASE / UPCOUNTRY)');
+  return requested;
+}
+
+/** ระยะทางอ้างอิงจาก Google Maps (ถ้าตั้ง API key) — ไม่ทำให้การบันทึกล้มถ้าเรียกไม่สำเร็จ */
+async function mapsDistance(t) {
+  const km = await drivingDistanceKm(t.origin, t.destination, t.destination_province);
+  return km === null ? '' : km;
+}
 
 const alive = (r) => !toBool(r.is_deleted);
 
@@ -44,13 +65,16 @@ export async function getRecordDetail(ctx, id) {
   const db = getDb();
   const record = await loadRecord(id);
   assertCanRead(ctx, record);
-  const [trips, expenses, users] = await Promise.all([db.list('trips'), db.list('expenses'), db.list('users')]);
+  const [trips, expenses, users, base] = await Promise.all([
+    db.list('trips'), db.list('expenses'), db.list('users'), record.base_id ? db.get('bases', record.base_id) : null
+  ]);
   const myTrips = trips.filter((t) => t.daily_record_id === id && alive(t))
     .sort((a, b) => Number(a.sequence_no) - Number(b.sequence_no));
   const myExpenses = expenses.filter((e) => e.daily_record_id === id && alive(e));
   const employee = users.find((u) => u.employee_id === record.employee_id);
   return {
     record: { ...record, employee_name: employee?.full_name || '' },
+    base_provinces: base?.provinces || '',
     trips: myTrips.map((t) => ({ ...t, expenses: myExpenses.filter((e) => e.trip_id === t.trip_id) })),
     summary: calcRecordSummary(myTrips, myExpenses)
   };
@@ -127,7 +151,7 @@ async function vehicleSnapshot(ctx, vehicleId) {
 }
 
 export async function addTrip(ctx, recordId, input) {
-  await loadOwnEditableRecord(ctx, recordId);
+  const record = await loadOwnEditableRecord(ctx, recordId);
   checkOdometer(input);
   const db = getDb();
   const trips = (await db.list('trips')).filter((t) => t.daily_record_id === recordId);
@@ -137,8 +161,10 @@ export async function addTrip(ctx, recordId, input) {
   const row = {
     trip_id: uuid(), daily_record_id: recordId, employee_id: ctx.user.employee_id,
     ...(await vehicleSnapshot(ctx, input.vehicle_id)), ...data,
+    travel_type: await resolveTravelType(record, input.destination_province, input.travel_type),
     distance_km: round2(input.distance_km), sequence_no: seq, created_at: ts, updated_at: ts, is_deleted: false
   };
+  row.maps_distance_km = await mapsDistance(row);
   await db.insert('trips', row);
   await touchRecord(recordId);
   return row;
@@ -158,6 +184,14 @@ export async function updateTrip(ctx, tripId, patch) {
   checkOdometer({ ...t, ...data });
   if (data.vehicle_id && data.vehicle_id !== t.vehicle_id) Object.assign(data, await vehicleSnapshot(ctx, data.vehicle_id));
   if (data.distance_km !== undefined) data.distance_km = round2(data.distance_km);
+  const merged = { ...t, ...data };
+  if (data.destination_province !== undefined || data.travel_type !== undefined) {
+    const record = await getDb().get('dailyRecords', t.daily_record_id);
+    data.travel_type = await resolveTravelType(record, merged.destination_province, merged.travel_type);
+  }
+  if (['origin', 'destination', 'destination_province'].some((k) => data[k] !== undefined && data[k] !== t[k])) {
+    data.maps_distance_km = await mapsDistance(merged);
+  }
   const row = await getDb().update('trips', tripId, { ...data, updated_at: nowIso() }, { expectedUpdatedAt: expected });
   await touchRecord(t.daily_record_id);
   return row;
@@ -186,7 +220,8 @@ export async function addExpense(ctx, tripId, input) {
     expense_id: uuid(), trip_id: tripId, daily_record_id: t.daily_record_id, employee_id: ctx.user.employee_id,
     ...input, amount: round2(input.amount),
     receipt_status: input.receipt_file_id ? 'UPLOADED' : 'NONE',
-    reimbursement_status: 'PENDING', reimbursed_amount: '', reimbursed_at: '',
+    // ในเขต Base: รวมในเบี้ยเลี้ยงรายวันแล้ว ไม่เบิกแยก · นอก Base: รอเบิกผ่าน SAP Concur
+    reimbursement_status: t.travel_type === 'BASE' ? 'NOT_CLAIMED' : 'PENDING', reimbursed_amount: '', reimbursed_at: '',
     created_at: ts, updated_at: ts, is_deleted: false
   };
   await getDb().insert('expenses', row);

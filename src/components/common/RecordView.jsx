@@ -2,6 +2,25 @@ import { ReceiptButton } from '../forms';
 import { StatusBadge } from './index';
 import { km, money, thaiDate, thaiDateTime } from '../../utils/format';
 import { EXPENSE_TYPE_LABEL, RECEIPT_LABEL, REIMBURSE_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/labels';
+import { JOB_TYPES, googleMapsDirUrl } from '../../../shared/provinces';
+
+/** เทียบระยะที่กรอกกับ Google Maps (ถ้ามี) — ต่างเกิน 20% ขึ้นสีแดง */
+function DistanceCheck({ trip }) {
+  const maps = Number(trip.maps_distance_km);
+  const url = googleMapsDirUrl(trip.origin, trip.destination, trip.destination_province);
+  const diff = maps > 0 ? ((Number(trip.distance_km) - maps) / maps) * 100 : null;
+  const flagged = diff !== null && Math.abs(diff) > 20;
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+      {diff !== null && (
+        <span className={`rounded-md px-1.5 py-0.5 ${flagged ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+          Google Maps {km(maps)} ({diff > 0 ? '+' : ''}{diff.toFixed(0)}%){flagged ? ' ⚠ ต่างเกิน 20%' : ' ✓'}
+        </span>
+      )}
+      <a href={url} target="_blank" rel="noreferrer" className="font-semibold text-brand-700 underline">ดูเส้นทางใน Google Maps</a>
+    </p>
+  );
+}
 
 /**
  * แสดง Daily Record + เที่ยว + ค่าใช้จ่าย
@@ -36,13 +55,22 @@ export default function RecordView({ detail, tripActions, expenseActions, tripFo
         <div key={t.trip_id} className="card">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-slate-400">เที่ยวที่ {t.sequence_no} · {TRAVEL_TYPE_LABEL[t.travel_type]}</p>
-              <p className="font-semibold">{t.origin} → {t.destination}</p>
+              <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-400">
+                เที่ยวที่ {t.sequence_no}
+                <span className={`rounded-full px-2 py-0.5 ${t.travel_type === 'BASE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{TRAVEL_TYPE_LABEL[t.travel_type]}</span>
+              </p>
+              <p className="font-semibold">{t.origin} → {t.destination}{t.destination_province && <span className="font-normal text-slate-500"> ({t.destination_province})</span>}</p>
+              {(t.customer_name || t.job_type || t.ticket_no) && (
+                <p className="text-sm text-slate-700">
+                  {[t.customer_name, JOB_TYPES[t.job_type], t.ticket_no && `#${t.ticket_no}`].filter(Boolean).join(' · ')}
+                </p>
+              )}
               <p className="text-sm text-slate-500">
                 {km(t.distance_km)} · {t.vehicle_model_snapshot} {t.license_plate_snapshot} · {t.fuel_type_snapshot}
                 {t.odometer_start !== '' && t.odometer_start !== undefined && ` · ไมล์ ${t.odometer_start}–${t.odometer_end}`}
               </p>
               {t.note && <p className="text-sm text-slate-600">{t.note}</p>}
+              <DistanceCheck trip={t} />
             </div>
             <div className="flex shrink-0 gap-1">{tripActions?.(t)}</div>
           </div>

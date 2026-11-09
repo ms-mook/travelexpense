@@ -124,3 +124,61 @@ export function monthlyAnalysis({ monthlyActualTotal, tripExpenses, kmReimbursem
     expense_gap: expenseGap
   };
 }
+
+/**
+ * แยกบัญชี "วันใน Base" กับ "วันนอก Base" — ตอบคำถามว่าเบี้ยเลี้ยงใน Base (เช่น 570/วัน) พอหรือไม่
+ *
+ * ค่าใช้จ่ายจริงรายเดือน (น้ำมัน/บำรุงรักษา/สึกหรอ/อื่น ๆ) ไม่ได้แยกเป็นรายเที่ยว จึงปันส่วนตามสัดส่วนกิโลเมตร:
+ *   ส่วนของ Base = Monthly Actual × (Base KM ÷ Total KM)
+ *
+ *   Base:      ต้นทุน = ส่วนปันของ Base + ค่าใช้จ่ายรายเที่ยวในเขต Base (รวมในเบี้ยเลี้ยงแล้ว ไม่เบิกแยก)
+ *              Gap    = ต้นทุน − เบี้ยเลี้ยง DAILY_BASE              (> 0 = เบี้ยเลี้ยงใน Base ไม่พอ)
+ *   Upcountry: ต้นทุน = ส่วนปันของ Upcountry + ค่าใช้จ่ายรายเที่ยวนอก Base
+ *              Gap    = ต้นทุน − ยอดที่เบิกคืน (Concur) − ค่าชดเชยต่อกม. − เบี้ยเลี้ยง DAILY_UPCOUNTRY
+ */
+export function segmentAnalysis({ trips, expenses, monthlyActualTotal = 0, allowanceLines = [], kmReimbursement = 0 }) {
+  const live = trips.filter(alive);
+  const dist = summarizeDistance(live);
+  const tripType = Object.fromEntries(live.map((t) => [t.trip_id, t.travel_type]));
+  const exp = expenses.filter(alive);
+  const baseExp = summarizeTripExpenses(exp.filter((e) => tripType[e.trip_id] === 'BASE'));
+  const upExp = summarizeTripExpenses(exp.filter((e) => tripType[e.trip_id] === 'UPCOUNTRY'));
+  const share = dist.total_km > 0 ? dist.base_km / dist.total_km : 0;
+  const actual = toNumber(monthlyActualTotal);
+  const baseAllocated = round2(actual * share);
+  const upAllocated = round2(actual - baseAllocated);
+  const sumLines = (type) => round2(allowanceLines.filter((l) => l.type === type).reduce((s, l) => s + toNumber(l.rate), 0));
+  const baseDays = allowanceLines.filter((l) => l.type === 'DAILY_BASE').length;
+  const upDays = allowanceLines.filter((l) => l.type === 'DAILY_UPCOUNTRY').length;
+
+  const baseCost = round2(baseAllocated + baseExp.total);
+  const baseAllowance = sumLines('DAILY_BASE');
+  const upCost = round2(upAllocated + upExp.total);
+  const upReimbursed = round2(upExp.reimbursed + toNumber(kmReimbursement));
+  const upAllowance = sumLines('DAILY_UPCOUNTRY');
+
+  return {
+    km_share_base: Math.round(share * 1000) / 1000,
+    base: {
+      days: baseDays,
+      km: dist.base_km,
+      allocated_actual: baseAllocated,
+      trip_expenses: baseExp.total,
+      cost: baseCost,
+      allowance: baseAllowance,
+      gap: round2(baseCost - baseAllowance),
+      cost_per_day: baseDays ? round2(baseCost / baseDays) : 0
+    },
+    upcountry: {
+      days: upDays,
+      km: dist.upcountry_km,
+      allocated_actual: upAllocated,
+      trip_expenses: upExp.total,
+      cost: upCost,
+      reimbursed: upReimbursed,
+      allowance: upAllowance,
+      gap: round2(upCost - upReimbursed - upAllowance),
+      cost_per_day: upDays ? round2(upCost / upDays) : 0
+    }
+  };
+}

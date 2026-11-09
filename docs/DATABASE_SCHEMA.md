@@ -41,6 +41,7 @@ Primary key: `base_id`
 | `status` |  |
 | `created_at` | เพิ่มจากแผน v1.0 |
 | `updated_at` | เพิ่มจากแผน v1.0 |
+| `provinces` | เพิ่มจากแผน v1.0 |
 
 ## 03_base_assignments
 
@@ -118,6 +119,11 @@ Primary key: `trip_id`
 | `created_at` |  |
 | `updated_at` |  |
 | `is_deleted` |  |
+| `destination_province` | เพิ่มจากแผน v1.0 |
+| `customer_name` | เพิ่มจากแผน v1.0 |
+| `job_type` | เพิ่มจากแผน v1.0 |
+| `ticket_no` | เพิ่มจากแผน v1.0 |
+| `maps_distance_km` | เพิ่มจากแผน v1.0 |
 
 ## 07_expenses
 

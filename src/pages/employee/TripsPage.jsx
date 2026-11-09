@@ -27,7 +27,7 @@ export default function TripsPage() {
         throw err;
       }
     });
-    if (rec) navigate(`/trips/${rec.daily_record_id}`);
+    if (rec) navigate(`/trips/${rec.daily_record_id}${rec.status ? '?add=1' : ''}`);
   }
 
   return (
@@ -52,12 +52,18 @@ export default function TripsPage() {
         ))}
       </ul>
 
-      <Modal open={open} title="เพิ่มรายการประจำวัน" onClose={() => setOpen(false)}>
+      <Modal open={open} title="บันทึกการเดินทางของวัน" onClose={() => setOpen(false)}>
         <form className="space-y-3" onSubmit={onCreate}>
-          <Field label="วันที่"><input name="record_date" type="date" className="input" defaultValue={today()} max={today()} required /></Field>
-          <Field label="หมายเหตุ"><textarea name="employee_note" rows={2} className="input" /></Field>
+          <p className="rounded-xl bg-brand-50 p-3 text-sm text-brand-800">
+            1 วัน = 1 รายการ · เลือกวันที่ แล้วระบบจะพาไปเพิ่ม <b>เที่ยวเดินทาง</b> ทีละเที่ยว
+            (ต้นทาง → ปลายทาง, ลูกค้า, ระยะทาง) จากนั้นค่อยใส่ค่าทางด่วน/จอดรถ
+          </p>
+          <Field label="วันที่เดินทาง"><input name="record_date" type="date" className="input" defaultValue={today()} max={today()} required /></Field>
+          <Field label="หมายเหตุของวัน (ไม่บังคับ)" hint="เช่น ออกต่างจังหวัด 2 วัน / รถเข้าศูนย์">
+            <textarea name="employee_note" rows={2} className="input" />
+          </Field>
           <ErrorBanner message={create.error} />
-          <button type="submit" className="btn-primary w-full" disabled={create.busy}>สร้างรายการ</button>
+          <button type="submit" className="btn-primary w-full" disabled={create.busy}>ถัดไป: เพิ่มเที่ยวแรก →</button>
         </form>
       </Modal>
     </div>

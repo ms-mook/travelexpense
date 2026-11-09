@@ -113,3 +113,48 @@ test('username → อีเมลภายใน และตรวจรูป
   assert.ok(!isValidUsername('ชื่อไทย'));
   assert.ok(!isValidUsername('a b c'));
 });
+
+import { segmentAnalysis } from '../server/domain/calculations.js';
+
+test('segmentAnalysis: ปันส่วนค่าใช้จ่ายรายเดือนตาม KM และเทียบเบี้ยเลี้ยง Base 570 / Upcountry 300', () => {
+  const trips = [
+    { trip_id: 't1', travel_type: 'BASE', distance_km: 300 },
+    { trip_id: 't2', travel_type: 'UPCOUNTRY', distance_km: 100 },
+    { trip_id: 'x', travel_type: 'BASE', distance_km: 999, is_deleted: true }
+  ];
+  const expenses = [
+    { trip_id: 't1', expense_type: 'TOLL', amount: 200, reimbursement_status: 'NOT_CLAIMED' },
+    { trip_id: 't2', expense_type: 'PARKING', amount: 50, reimbursement_status: 'REIMBURSED' }
+  ];
+  const lines = [
+    { type: 'DAILY_BASE', rate: 570 }, { type: 'DAILY_BASE', rate: 570 }, { type: 'DAILY_UPCOUNTRY', rate: 300 }
+  ];
+  const r = segmentAnalysis({ trips, expenses, monthlyActualTotal: 4000, allowanceLines: lines });
+  assert.equal(r.km_share_base, 0.75);
+  assert.equal(r.base.allocated_actual, 3000);
+  assert.equal(r.base.cost, 3200);
+  assert.equal(r.base.allowance, 1140);
+  assert.equal(r.base.gap, 2060);
+  assert.equal(r.base.cost_per_day, 1600);
+  assert.equal(r.upcountry.allocated_actual, 1000);
+  assert.equal(r.upcountry.cost, 1050);
+  assert.equal(r.upcountry.reimbursed, 50);
+  assert.equal(r.upcountry.gap, 700);
+});
+
+import { classifyTravelType } from '../shared/provinces.js';
+import { distanceCheck } from '../server/domain/recordSummary.js';
+
+test('classifyTravelType จากจังหวัดของ Base', () => {
+  const bkk = 'กรุงเทพมหานคร,ปทุมธานี,นนทบุรี';
+  assert.equal(classifyTravelType(bkk, 'นนทบุรี'), 'BASE');
+  assert.equal(classifyTravelType(bkk, 'ชลบุรี'), 'UPCOUNTRY');
+  assert.equal(classifyTravelType('', 'ชลบุรี'), null);
+  assert.equal(classifyTravelType(bkk, ''), null);
+});
+
+test('distanceCheck ขึ้นธงเมื่อต่างจาก Google Maps เกิน 20%', () => {
+  assert.equal(distanceCheck({ distance_km: 130, maps_distance_km: 100 }).flagged, true);
+  assert.equal(distanceCheck({ distance_km: 110, maps_distance_km: 100 }).flagged, false);
+  assert.equal(distanceCheck({ distance_km: 110, maps_distance_km: '' }), null);
+});

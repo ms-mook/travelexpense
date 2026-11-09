@@ -9,6 +9,7 @@ import { assertBaseInScope } from '../middleware/auth.js';
 import { baseForDate } from './adminService.js';
 import { diff, writeAudit } from './auditService.js';
 import { COST_FIELDS } from './monthlyActualService.js';
+import { resolveTravelType } from './dailyRecordService.js';
 
 const alive = (r) => !toBool(r.is_deleted);
 const inScope = (ctx, baseId) => ctx.scope.allBases || ctx.scope.baseIds.includes(baseId);
@@ -60,8 +61,14 @@ export async function editTrip(ctx, tripId, patch) {
   const r = await loadRecordForSecretary(ctx, t.daily_record_id);
   if (!secretaryCanEdit(r.status)) throw invalidState('แก้ไขได้เฉพาะรายการที่ส่งตรวจแล้ว');
   const allowed = {};
-  for (const k of ['travel_type', 'origin', 'destination', 'distance_km', 'odometer_start', 'odometer_end', 'note']) {
+  for (const k of ['travel_type', 'origin', 'destination', 'destination_province', 'distance_km', 'odometer_start',
+    'odometer_end', 'note', 'customer_name', 'job_type', 'ticket_no']) {
     if (patch[k] !== undefined) allowed[k] = k === 'distance_km' ? round2(patch[k]) : patch[k];
+  }
+  // เปลี่ยนจังหวัดแต่ไม่ได้ระบุประเภท → คำนวณใหม่ตามจังหวัดของ Base (Secretary ระบุประเภทเองเพื่อ override ได้)
+  if (!allowed.travel_type) delete allowed.travel_type;
+  if (allowed.destination_province !== undefined && !patch.travel_type) {
+    allowed.travel_type = await resolveTravelType(r, allowed.destination_province, t.travel_type);
   }
   const { oldV, newV, changed } = diff(t, allowed);
   if (!changed) return t;

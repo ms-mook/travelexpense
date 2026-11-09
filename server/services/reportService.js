@@ -4,7 +4,7 @@
  */
 import { getDb } from '../db/index.js';
 import {
-  computeDailyAllowance, computeKmReimbursement, monthlyAnalysis, summarizeDistance, summarizeTripExpenses
+  computeDailyAllowance, computeKmReimbursement, monthlyAnalysis, segmentAnalysis, summarizeDistance, summarizeTripExpenses
 } from '../domain/calculations.js';
 import { round2, toBool } from '../lib/utils.js';
 import { baseForDate } from './adminService.js';
@@ -55,6 +55,26 @@ function employeeMonth(data, user, month) {
     includeTripExpenses: settings.includeTripExpensesInActual
   });
 
+  const segments = segmentAnalysis({
+    trips: myTrips, expenses: myExpenses, monthlyActualTotal: actualCounted ? actual.actual_total : 0,
+    allowanceLines: allowance.lines, kmReimbursement
+  });
+
+  // งานที่ได้: นับจากเที่ยวที่ระบุประเภทงาน/เลขใบงาน
+  const jobTrips = myTrips.filter((t) => t.job_type || t.ticket_no);
+  const tickets = new Set(myTrips.map((t) => String(t.ticket_no || '').trim()).filter(Boolean));
+  const byJobType = jobTrips.reduce((acc, t) => ({ ...acc, [t.job_type || 'OTHER']: (acc[t.job_type || 'OTHER'] || 0) + 1 }), {});
+  const customers = new Set(myTrips.map((t) => String(t.customer_name || '').trim()).filter(Boolean));
+  const jobCount = tickets.size || jobTrips.length;
+  const jobs = {
+    trips_with_job: jobTrips.length,
+    job_count: jobCount,
+    customer_count: customers.size,
+    by_job_type: byJobType,
+    cost_per_job: jobCount ? round2(analysis.actual_operating_cost / jobCount) : 0,
+    net_burden_per_job: jobCount ? round2(analysis.net_employee_burden / jobCount) : 0
+  };
+
   const pendingRecords = records.filter((r) => r.employee_id === user.employee_id && alive(r) &&
     String(r.record_date).startsWith(month) && !okStatus.includes(r.status)).length;
 
@@ -74,6 +94,8 @@ function employeeMonth(data, user, month) {
       vehicle_wear_cost: actual.vehicle_wear_cost, other_cost: actual.other_cost, actual_total: actual.actual_total
     } : null,
     ...analysis,
+    segments,
+    jobs,
     data_quality: {
       monthly_actual_missing: !actual,
       monthly_actual_not_counted: Boolean(actual && !actualCounted),
@@ -97,6 +119,23 @@ function aggregate(rows) {
   }
   for (const k of Object.keys(t)) t[k] = round2(t[k]);
   t.employee_count = rows.length;
+  // รวมบัญชี Base / Upcountry
+  const seg = (side, keys) => Object.fromEntries(keys.map((k) => [k, round2(rows.reduce((s, r) => s + (Number(r.segments?.[side]?.[k]) || 0), 0))]));
+  t.segments = {
+    base: seg('base', ['days', 'km', 'allocated_actual', 'trip_expenses', 'cost', 'allowance', 'gap']),
+    upcountry: seg('upcountry', ['days', 'km', 'allocated_actual', 'trip_expenses', 'cost', 'reimbursed', 'allowance', 'gap'])
+  };
+  for (const side of ['base', 'upcountry']) {
+    const s = t.segments[side];
+    s.cost_per_day = s.days ? round2(s.cost / s.days) : 0;
+  }
+  t.segments.base.employees_short = rows.filter((r) => (r.segments?.base?.gap || 0) > 0 && r.segments?.base?.days > 0).length;
+  t.segments.base.employees_with_days = rows.filter((r) => r.segments?.base?.days > 0).length;
+  t.jobs = {
+    job_count: rows.reduce((s, r) => s + (r.jobs?.job_count || 0), 0),
+    trips_with_job: rows.reduce((s, r) => s + (r.jobs?.trips_with_job || 0), 0)
+  };
+  t.jobs.cost_per_job = t.jobs.job_count ? round2(t.actual_operating_cost / t.jobs.job_count) : 0;
   return t;
 }
 
@@ -148,7 +187,8 @@ export async function exportCsv({ month, baseId }) {
     'base_km', 'upcountry_km', 'total_km', 'toll', 'parking', 'other_trip_expense', 'trip_expense_total',
     'trip_expense_reimbursed', 'monthly_actual_status', 'fuel_cost', 'maintenance_cost', 'vehicle_wear_cost',
     'other_cost', 'monthly_actual_total', 'km_reimbursement', 'actual_operating_cost', 'reimbursed_expense',
-    'net_employee_burden', 'daily_allowance', 'expense_gap', 'records_not_counted', 'missing_policy_days'];
+    'net_employee_burden', 'daily_allowance', 'expense_gap', 'base_cost', 'base_allowance', 'base_gap', 'base_cost_per_day',
+    'upcountry_cost', 'upcountry_allowance', 'upcountry_gap', 'job_count', 'cost_per_job', 'records_not_counted', 'missing_policy_days'];
   const esc = (v) => {
     let s2 = String(v ?? '');
     if (/^[=+\-@]/.test(s2) && Number.isNaN(Number(s2))) s2 = `'${s2}`; // กัน CSV injection
@@ -163,7 +203,9 @@ export async function exportCsv({ month, baseId }) {
       r.trip_expenses.total, r.trip_expenses.reimbursed, ma.status || 'MISSING', ma.fuel_cost ?? '',
       ma.maintenance_cost ?? '', ma.vehicle_wear_cost ?? '', ma.other_cost ?? '', ma.actual_total ?? '',
       r.components.km_reimbursement, r.actual_operating_cost, r.reimbursed_expense, r.net_employee_burden,
-      r.daily_allowance, r.expense_gap, r.data_quality.records_not_counted, r.data_quality.missing_policy_days
+      r.daily_allowance, r.expense_gap, r.segments.base.cost, r.segments.base.allowance, r.segments.base.gap,
+      r.segments.base.cost_per_day, r.segments.upcountry.cost, r.segments.upcountry.allowance, r.segments.upcountry.gap,
+      r.jobs.job_count, r.jobs.cost_per_job, r.data_quality.records_not_counted, r.data_quality.missing_policy_days
     ].map(esc).join(','));
   }
   return `﻿${lines.join('\r\n')}\r\n`;

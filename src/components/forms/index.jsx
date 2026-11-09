@@ -1,47 +1,144 @@
 import { useState } from 'react';
 import { ErrorBanner, Field } from '../common';
 import { useAction } from '../../hooks/useAsync';
-import { expenseService } from '../../services';
+import { expenseService, mapsService } from '../../services';
+import { JOB_TYPES, PROVINCES, classifyTravelType, googleMapsDirUrl, parseProvinces } from '../../../shared/provinces';
 import { compressImage, fileToBase64 } from '../../utils/format';
 import { EXPENSE_TYPE_LABEL, FUEL_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/labels';
 
 const formData = (e) => Object.fromEntries(new FormData(e.currentTarget).entries());
 
-export function TripForm({ vehicles, initial = {}, onSubmit, onCancel, busy, error }) {
+/** หัวข้อของแต่ละส่วนในฟอร์ม */
+function Section({ n, title, hint, children }) {
   return (
-    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); onSubmit(formData(e)); }}>
-      <Field label="รถที่ใช้">
-        <select name="vehicle_id" className="input" required defaultValue={initial.vehicle_id || vehicles[0]?.vehicle_id}>
-          {vehicles.map((v) => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_brand} {v.vehicle_model} · {v.license_plate}</option>)}
-        </select>
-      </Field>
-      <Field label="ประเภทการเดินทาง">
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(TRAVEL_TYPE_LABEL).map(([k, label]) => (
-            <label key={k} className="flex cursor-pointer items-center gap-2 rounded-xl p-3 ring-1 ring-slate-300 has-[:checked]:bg-brand-50 has-[:checked]:ring-2 has-[:checked]:ring-brand-600">
-              <input type="radio" name="travel_type" value={k} defaultChecked={(initial.travel_type || 'BASE') === k} />
-              <span className="text-sm">{label}</span>
-            </label>
-          ))}
+    <section className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+      <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-700 text-xs text-white">{n}</span>
+        {title}
+      </p>
+      {hint && <p className="-mt-1 mb-2 text-xs text-slate-500">{hint}</p>}
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * ฟอร์มเที่ยวเดินทาง แบ่ง 4 ส่วน: ไปไหน → ไปทำอะไร → ระยะทาง → รถ/อื่น ๆ
+ * ประเภท BASE/UPCOUNTRY คำนวณจากจังหวัดปลายทาง (Backend ตรวจซ้ำ)
+ */
+export function TripForm({ vehicles, initial = {}, defaultOrigin = '', baseName = '', baseProvinces = '', mapsAvailable = false,
+  onSubmit, onCancel, busy, error }) {
+  const [origin, setOrigin] = useState(initial.origin ?? defaultOrigin);
+  const [destination, setDestination] = useState(initial.destination || '');
+  const [province, setProvince] = useState(initial.destination_province || '');
+  const [distance, setDistance] = useState(initial.distance_km ?? '');
+  const [manualType, setManualType] = useState(initial.travel_type || 'BASE');
+  const maps = useAction();
+  const [mapsKm, setMapsKm] = useState(null);
+  const auto = classifyTravelType(baseProvinces, province);
+  const hasBaseProvinces = parseProvinces(baseProvinces).length > 0;
+  const travelType = hasBaseProvinces ? auto : manualType;
+  const mapsUrl = googleMapsDirUrl(origin, destination, province);
+
+  async function calcDistance() {
+    const r = await maps.run(() => mapsService.distance(origin, destination, province));
+    if (r?.distance_km) { setMapsKm(r.distance_km); if (!distance) setDistance(r.distance_km); }
+    else if (r) maps.setError('Google Maps หาเส้นทางไม่เจอ ลองระบุปลายทางให้ชัดขึ้น หรือกรอกระยะเอง');
+  }
+
+  return (
+    <form className="space-y-3" onSubmit={(e) => {
+      e.preventDefault();
+      const body = formData(e);
+      if (!hasBaseProvinces) body.travel_type = manualType;
+      onSubmit(body);
+    }}>
+      <Section n="1" title="ไปไหน" hint="ต้นทางเที่ยวแรกของวันมักเป็นบ้านหรือสำนักงาน เที่ยวถัดไประบบเติมจากปลายทางเที่ยวก่อนให้">
+        <Field label="ต้นทาง">
+          <input name="origin" className="input" required maxLength={200} value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="เช่น สำนักงาน Sysmex ขอนแก่น" />
+        </Field>
+        <Field label="ปลายทาง (ชื่อสถานที่)">
+          <input name="destination" className="input" required maxLength={200} value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="เช่น โรงพยาบาลศรีนครินทร์" />
+        </Field>
+        <Field label="จังหวัดปลายทาง">
+          <select name="destination_province" className="input" required={hasBaseProvinces} value={province} onChange={(e) => setProvince(e.target.value)}>
+            <option value="">— เลือกจังหวัด —</option>
+            {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </Field>
+        {hasBaseProvinces ? (
+          travelType && (
+            <div className={`rounded-xl p-3 text-sm ${travelType === 'BASE' ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-amber-50 text-amber-900 ring-1 ring-amber-200'}`}>
+              {travelType === 'BASE'
+                ? <>✓ <b>ในเขต Base {baseName}</b> · ค่าทางด่วน/จอดรถรวมอยู่ในเบี้ยเลี้ยงรายวันแล้ว</>
+                : <>↗ <b>นอก Base (Upcountry)</b> · ได้เบี้ยเลี้ยงต่างจังหวัดแทน และค่าใช้จ่ายเบิกผ่าน SAP Concur</>}
+            </div>
+          )
+        ) : (
+          <Field label="ประเภทการเดินทาง" hint="Base นี้ยังไม่ได้ตั้งจังหวัด — กรุณาเลือกเอง">
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(TRAVEL_TYPE_LABEL).map(([k, label]) => (
+                <button key={k} type="button" onClick={() => setManualType(k)}
+                  className={`rounded-xl p-3 text-sm ring-1 ${manualType === k ? 'bg-brand-50 ring-2 ring-brand-600' : 'ring-slate-300'}`}>{label}</button>
+              ))}
+            </div>
+          </Field>
+        )}
+      </Section>
+
+      <Section n="2" title="ไปทำอะไร" hint="ใช้วิเคราะห์ต้นทุนต่องานและต่อลูกค้า (ไม่บังคับ แต่แนะนำให้กรอก)">
+        <Field label="ลูกค้า / หน่วยงาน">
+          <input name="customer_name" className="input" maxLength={200} defaultValue={initial.customer_name} placeholder="เช่น รพ.ขอนแก่น — ห้องแล็บ" />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="ประเภทงาน">
+            <select name="job_type" className="input" defaultValue={initial.job_type || ''}>
+              <option value="">— ไม่ระบุ —</option>
+              {Object.entries(JOB_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </Field>
+          <Field label="เลขใบงาน / Ticket">
+            <input name="ticket_no" className="input" maxLength={60} defaultValue={initial.ticket_no} placeholder="เช่น SR-240115" />
+          </Field>
         </div>
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="ต้นทาง"><input name="origin" className="input" required maxLength={200} defaultValue={initial.origin} /></Field>
-        <Field label="ปลายทาง"><input name="destination" className="input" required maxLength={200} defaultValue={initial.destination} /></Field>
-      </div>
-      <Field label="ระยะทางจริง (กม.)" hint="ทศนิยมได้ 2 ตำแหน่ง">
-        <input name="distance_km" type="number" inputMode="decimal" step="0.01" min="0" max="5000" className="input" required defaultValue={initial.distance_km} />
-      </Field>
-      <details className="rounded-xl bg-slate-50 p-3 text-sm" open={Boolean(initial.odometer_start)}>
-        <summary className="cursor-pointer text-slate-600">เลขไมล์ (ไม่บังคับ)</summary>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <Field label="เริ่มต้น"><input name="odometer_start" type="number" inputMode="decimal" step="0.1" min="0" className="input" defaultValue={initial.odometer_start} /></Field>
-          <Field label="สิ้นสุด"><input name="odometer_end" type="number" inputMode="decimal" step="0.1" min="0" className="input" defaultValue={initial.odometer_end} /></Field>
+      </Section>
+
+      <Section n="3" title="ระยะทาง" hint="อ้างอิงระยะตาม Google Maps — Secretary จะตรวจเทียบกับเส้นทางนี้">
+        <div className="flex flex-wrap gap-2">
+          <a href={mapsUrl} target="_blank" rel="noreferrer"
+            className={`btn-secondary px-3 py-2 text-xs ${destination ? '' : 'pointer-events-none opacity-50'}`}>🗺 เปิดเส้นทางใน Google Maps</a>
+          {mapsAvailable && (
+            <button type="button" className="btn-secondary px-3 py-2 text-xs" disabled={!origin || !destination || maps.busy} onClick={calcDistance}>
+              {maps.busy ? 'กำลังคำนวณ...' : '⚡ ให้ระบบคำนวณระยะ'}
+            </button>
+          )}
         </div>
-      </details>
-      <Field label="หมายเหตุ"><textarea name="note" rows={2} className="input" maxLength={1000} defaultValue={initial.note} /></Field>
+        {mapsKm && <p className="text-xs text-slate-600">Google Maps: <b>{mapsKm} กม.</b></p>}
+        <ErrorBanner message={maps.error} />
+        <Field label="ระยะทางจริงที่ขับ (กม.)" hint="ขับเที่ยวเดียว ถ้าขับกลับให้เพิ่มเป็นอีกเที่ยว · ทศนิยมได้ 2 ตำแหน่ง">
+          <input name="distance_km" type="number" inputMode="decimal" step="0.01" min="0" max="5000" className="input" required
+            value={distance} onChange={(e) => setDistance(e.target.value)} placeholder="เช่น 24.5" />
+        </Field>
+      </Section>
+
+      <Section n="4" title="รถและรายละเอียดอื่น">
+        <Field label="รถที่ใช้">
+          <select name="vehicle_id" className="input" required defaultValue={initial.vehicle_id || vehicles[0]?.vehicle_id}>
+            {vehicles.map((v) => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_brand} {v.vehicle_model} · {v.license_plate}</option>)}
+          </select>
+        </Field>
+        <details className="rounded-xl bg-white p-3 text-sm ring-1 ring-slate-200" open={Boolean(initial.odometer_start)}>
+          <summary className="cursor-pointer text-slate-600">เลขไมล์ (ไม่บังคับ)</summary>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Field label="เริ่มต้น"><input name="odometer_start" type="number" inputMode="decimal" step="0.1" min="0" className="input" defaultValue={initial.odometer_start} /></Field>
+            <Field label="สิ้นสุด"><input name="odometer_end" type="number" inputMode="decimal" step="0.1" min="0" className="input" defaultValue={initial.odometer_end} /></Field>
+          </div>
+        </details>
+        <Field label="หมายเหตุ"><textarea name="note" rows={2} className="input" maxLength={1000} defaultValue={initial.note} /></Field>
+      </Section>
+
       <ErrorBanner message={error} />
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 bg-white px-1 pb-1 pt-2">
         {onCancel && <button type="button" className="btn-secondary" onClick={onCancel}>ยกเลิก</button>}
         <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'กำลังบันทึก...' : 'บันทึกเที่ยว'}</button>
       </div>
@@ -49,7 +146,7 @@ export function TripForm({ vehicles, initial = {}, onSubmit, onCancel, busy, err
   );
 }
 
-export function ExpenseForm({ onSubmit, onCancel, busy, error }) {
+export function ExpenseForm({ travelType, onSubmit, onCancel, busy, error }) {
   const [receipt, setReceipt] = useState(null);
   const upload = useAction();
 
@@ -69,6 +166,11 @@ export function ExpenseForm({ onSubmit, onCancel, busy, error }) {
       e.preventDefault();
       onSubmit({ ...formData(e), receipt: undefined, ...(receipt ? { receipt_file_id: receipt.receipt_file_id, receipt_name: receipt.receipt_name, receipt_mime: receipt.receipt_mime } : {}) });
     }}>
+      <p className={`rounded-xl p-3 text-xs ${travelType === 'BASE' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}>
+        {travelType === 'BASE'
+          ? 'เที่ยวในเขต Base: ค่าใช้จ่ายนี้รวมอยู่ในเบี้ยเลี้ยงรายวันแล้ว (ไม่เบิกแยก) — บันทึกไว้เพื่อวิเคราะห์ว่าเบี้ยเลี้ยงพอหรือไม่'
+          : 'เที่ยวนอก Base: บันทึกไว้เพื่อติดตามการเบิกผ่าน SAP Concur — Secretary จะอัปเดตสถานะเมื่อได้รับเงินคืน'}
+      </p>
       <Field label="ประเภทค่าใช้จ่าย">
         <select name="expense_type" className="input" required>
           {Object.entries(EXPENSE_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

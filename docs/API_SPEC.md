@@ -26,6 +26,7 @@
 |---|---|---|
 | GET | `/auth/me` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
 | GET | `/bases` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
+| GET | `/maps/distance` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
 | GET | `/users/me` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
 | GET | `/me/overview` | EMPLOYEE |
 | GET | `/me/base-history` | EMPLOYEE |

@@ -53,7 +53,7 @@ export default function RecordsPage({ mode = 'pending' }) {
                   <td className="text-right tabular-nums">{km(r.summary.upcountry_km)}</td>
                   <td className="text-right tabular-nums">{money(r.summary.expenses.total)}</td>
                   <td className="whitespace-nowrap text-xs text-slate-500">{thaiDateTime(r.submitted_at)}</td>
-                  <td><StatusBadge status={r.status} /></td>
+                  <td><StatusBadge status={r.status} />{r.summary.distance_flags > 0 && <p className="mt-1 text-xs text-rose-600">⚠ ระยะต่างจาก Maps {r.summary.distance_flags} เที่ยว</p>}</td>
                   <td><Link className="font-semibold text-brand-700" to={`/secretary/review/${r.daily_record_id}`}>ตรวจ →</Link></td>
                 </tr>
               ))}

@@ -35,6 +35,7 @@ export function AuthProvider({ children }) {
     session,
     user: profile?.user || null,
     scope: profile?.scope || null,
+    features: profile?.features || {},
     loading: session === undefined || (session && !profile && !error),
     error,
     signIn: async (username, password) => {

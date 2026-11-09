@@ -6,6 +6,7 @@ import { useAction, useAsync } from '../../hooks/useAsync';
 import { secretaryService, tripService } from '../../services';
 import { thaiDateTime } from '../../utils/format';
 import { EXPENSE_TYPE_LABEL, RECEIPT_LABEL, REIMBURSE_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/labels';
+import { JOB_TYPES, PROVINCES } from '../../../shared/provinces';
 
 export default function ReviewPage() {
   const { id } = useParams();
@@ -66,15 +67,32 @@ export default function ReviewPage() {
             if (await act.run(() => secretaryService.editTrip(editTrip.trip_id, { ...formBody(e), updated_at: editTrip.updated_at }))) done();
           }}>
             <Field label="ประเภท">
-              <select name="travel_type" className="input" defaultValue={editTrip.travel_type}>
-                {Object.entries(TRAVEL_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              <select name="travel_type" className="input" defaultValue="">
+                <option value="">อัตโนมัติตามจังหวัด (ปัจจุบัน: {TRAVEL_TYPE_LABEL[editTrip.travel_type]})</option>
+                {Object.entries(TRAVEL_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>กำหนดเอง: {v}</option>)}
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="ต้นทาง"><input name="origin" className="input" defaultValue={editTrip.origin} /></Field>
               <Field label="ปลายทาง"><input name="destination" className="input" defaultValue={editTrip.destination} /></Field>
             </div>
+            <Field label="จังหวัดปลายทาง" hint="เปลี่ยนจังหวัดแล้วระบบจัดประเภท BASE/UPCOUNTRY ใหม่ให้ (ถ้า Base ตั้งจังหวัดไว้)">
+              <select name="destination_province" className="input" defaultValue={editTrip.destination_province || ''}>
+                <option value="">— ไม่ระบุ —</option>
+                {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
             <Field label="ระยะทาง (กม.)"><input name="distance_km" type="number" step="0.01" min="0" className="input" defaultValue={editTrip.distance_km} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="ลูกค้า"><input name="customer_name" className="input" defaultValue={editTrip.customer_name} /></Field>
+              <Field label="เลขใบงาน"><input name="ticket_no" className="input" defaultValue={editTrip.ticket_no} /></Field>
+            </div>
+            <Field label="ประเภทงาน">
+              <select name="job_type" className="input" defaultValue={editTrip.job_type || ''}>
+                <option value="">— ไม่ระบุ —</option>
+                {Object.entries(JOB_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </Field>
             <Field label="เหตุผลการแก้ไข (จำเป็น)"><textarea name="reason" required rows={2} className="input" /></Field>
             <ErrorBanner message={act.error} />
             <button type="submit" className="btn-primary w-full" disabled={act.busy}>บันทึกการแก้ไข</button>
