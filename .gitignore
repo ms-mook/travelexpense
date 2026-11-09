@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dev-dist/
+.vercel/
+.env
+.env.*
+!.env.example
+*.pem
+service-account*.json
+.DS_Store
+coverage/
