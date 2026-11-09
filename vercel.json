@@ -4,19 +4,36 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/router.js": { "maxDuration": 30, "memory": 1024 }
+    "api/router.js": {
+      "maxDuration": 30
+    }
   },
   "rewrites": [
-    { "source": "/api/v1/:path*", "destination": "/api/router?__path=:path*" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/v1/:path*",
+      "destination": "/api/router?__path=:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     }
+  ],
+  "regions": [
+    "sin1"
   ]
 }

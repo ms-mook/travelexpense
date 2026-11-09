@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Travel Expense Web App สำหรับ Service Engineer — บันทึกการเดินทาง ค่าใช้จ่าย และวิเคราะห์เทียบ Daily Allowance",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "vite",
