@@ -17,7 +17,7 @@ export default function LoginPage() {
     setBusy(true);
     setError('');
     try {
-      await signIn(f.get('email'), f.get('password'));
+      await signIn(f.get('username'), f.get('password'));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -33,7 +33,7 @@ export default function LoginPage() {
         <p className="text-sm text-slate-500">บันทึกการเดินทางและค่าใช้จ่าย Service Engineer</p>
       </div>
       <form onSubmit={submit} className="card space-y-4 p-6">
-        <Field label="อีเมล"><input name="email" type="email" autoComplete="username" className="input" required /></Field>
+        <Field label="Username"><input name="username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="input" required /></Field>
         <Field label="รหัสผ่าน"><input name="password" type="password" autoComplete="current-password" className="input" required /></Field>
         <ErrorBanner message={error} />
         <button type="submit" className="btn-primary w-full" disabled={busy}>{busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>

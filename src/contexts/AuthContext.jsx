@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services';
+import { loginIdToAuthEmail } from '../../shared/username';
 
 const AuthContext = createContext(null);
 
@@ -36,9 +37,9 @@ export function AuthProvider({ children }) {
     scope: profile?.scope || null,
     loading: session === undefined || (session && !profile && !error),
     error,
-    signIn: async (email, password) => {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-      if (err) throw new Error(err.message === 'Invalid login credentials' ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : err.message);
+    signIn: async (username, password) => {
+      const { error: err } = await supabase.auth.signInWithPassword({ email: loginIdToAuthEmail(username), password });
+      if (err) throw new Error(err.message === 'Invalid login credentials' ? 'Username หรือรหัสผ่านไม่ถูกต้อง' : err.message);
     },
     signOut: () => supabase.auth.signOut(),
     reload: loadProfile

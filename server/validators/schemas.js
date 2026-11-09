@@ -56,7 +56,8 @@ export const monthlyActualSchema = {
 export const reasonSchema = { reason: { type: 'string', required: true, max: 500 } };
 
 export const userCreateSchema = {
-  email: { type: 'email', required: true },
+  username: { type: 'string', required: true, max: 30 },
+  email: { type: 'email' }, // อีเมลติดต่อ (ไม่บังคับ) — ไม่ใช้ login
   password: { type: 'string', required: true, max: 72 },
   full_name: { type: 'string', required: true, max: 120 },
   employee_code: { type: 'string', max: 30 },
@@ -68,6 +69,7 @@ export const userCreateSchema = {
 };
 
 export const userUpdateSchema = {
+  email: { type: 'email' },
   full_name: { type: 'string', max: 120 },
   employee_code: { type: 'string', max: 30 },
   department: { type: 'string', max: 80 },

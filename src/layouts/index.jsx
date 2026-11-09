@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { BottomNav, SideNav } from '../components/navigation';
-import { ErrorBanner, Spinner } from '../components/common';
+import { ErrorBanner, Modal, Spinner } from '../components/common';
+import { ChangePassword } from '../pages/employee/ProfilePage';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABEL } from '../utils/labels';
 
@@ -56,6 +58,7 @@ export function EmployeeLayout() {
 
 function StaffLayout({ items }) {
   const { user, signOut } = useAuth();
+  const [pwOpen, setPwOpen] = useState(false);
   return (
     <div className="min-h-screen md:flex">
       <aside className="border-b border-slate-200 bg-white p-3 md:sticky md:top-0 md:h-screen md:w-60 md:border-b-0 md:border-r md:p-4">
@@ -63,6 +66,7 @@ function StaffLayout({ items }) {
           <div>
             <p className="font-bold text-brand-800">Travel Expense</p>
             <p className="text-xs text-slate-500">{user?.full_name} · {ROLE_LABEL[user?.role]}</p>
+            <button type="button" className="text-xs text-brand-700 underline" onClick={() => setPwOpen(true)}>เปลี่ยนรหัสผ่าน</button>
           </div>
           <button type="button" className="btn-ghost px-2 py-1 text-xs md:hidden" onClick={signOut}>ออก</button>
         </div>
@@ -70,6 +74,7 @@ function StaffLayout({ items }) {
         <button type="button" className="btn-ghost mt-6 hidden w-full md:flex" onClick={signOut}>ออกจากระบบ</button>
       </aside>
       <main className="min-w-0 flex-1 p-4 md:p-6"><Outlet /></main>
+      <Modal open={pwOpen} title="เปลี่ยนรหัสผ่าน" onClose={() => setPwOpen(false)}><ChangePassword /></Modal>
     </div>
   );
 }

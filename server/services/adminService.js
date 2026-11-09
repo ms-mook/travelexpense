@@ -4,6 +4,7 @@ import { ROLES } from '../db/schema.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { inEffectiveRange, nowIso, todayTH, uuid } from '../lib/utils.js';
+import { isValidUsername, normalizeUsername, usernameToAuthEmail } from '../../shared/username.js';
 import { diff, writeAudit } from './auditService.js';
 
 /* ---------------- Users ---------------- */
@@ -21,13 +22,16 @@ export async function listUsers() {
 export async function createUser(ctx, input) {
   const db = getDb();
   const users = await db.list('users');
-  if (users.some((u) => String(u.email).toLowerCase() === input.email)) throw conflict('อีเมลนี้มีในระบบแล้ว');
+  const username = normalizeUsername(input.username);
+  if (!isValidUsername(username)) throw badRequest('Username ต้องยาว 3–30 ตัว ใช้ได้เฉพาะ a-z 0-9 . _ -');
+  if (users.some((u) => normalizeUsername(u.username) === username)) throw conflict('Username นี้มีในระบบแล้ว');
   if (input.password.length < 8) throw badRequest('รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร');
   if (input.base_id && !(await db.get('bases', input.base_id))) throw badRequest('ไม่พบ Base ที่ระบุ');
 
   const sb = await supabaseAdmin();
   const { data, error } = await sb.auth.admin.createUser({
-    email: input.email, password: input.password, email_confirm: true
+    email: usernameToAuthEmail(username), password: input.password, email_confirm: true,
+    user_metadata: { username, full_name: input.full_name }
   });
   if (error) throw badRequest(`สร้างบัญชี Auth ไม่สำเร็จ: ${error.message}`);
 
@@ -37,7 +41,8 @@ export async function createUser(ctx, input) {
     auth_user_id: data.user.id,
     employee_code: input.employee_code || '',
     full_name: input.full_name,
-    email: input.email,
+    username,
+    email: input.email || '',
     department: input.department || '',
     position: input.position || '',
     role: input.role,
@@ -56,7 +61,7 @@ export async function createUser(ctx, input) {
   }
   if (input.role !== ROLES.EMPLOYEE) {
     await db.insert('adminUsers', {
-      admin_id: uuid(), auth_user_id: user.auth_user_id, email: user.email, role: user.role,
+      admin_id: uuid(), auth_user_id: user.auth_user_id, email: user.username, role: user.role,
       team_scope: input.team_scope || (input.role === ROLES.SECRETARY ? '' : 'ALL'), status: 'ACTIVE', created_at: ts
     });
   }
@@ -87,7 +92,7 @@ export async function updateUser(ctx, employeeId, patch) {
   if (role !== ROLES.EMPLOYEE) {
     const scopePatch = { role, status: after.status, ...(teamScope !== undefined ? { team_scope: teamScope } : {}) };
     if (adminRow) await db.update('adminUsers', adminRow.admin_id, scopePatch);
-    else await db.insert('adminUsers', { admin_id: uuid(), auth_user_id: after.auth_user_id, email: after.email,
+    else await db.insert('adminUsers', { admin_id: uuid(), auth_user_id: after.auth_user_id, email: after.username,
       team_scope: teamScope || '', created_at: nowIso(), ...scopePatch });
   } else if (adminRow) {
     await db.update('adminUsers', adminRow.admin_id, { status: 'SUSPENDED' });

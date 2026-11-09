@@ -18,7 +18,7 @@ export default function UsersPage() {
   const open = (type, user) => { act.setError(''); setModal({ type, user }); };
   const done = () => { close(); users.reload(); };
   const baseName = (id) => bases.data?.find((b) => b.base_id === id)?.base_name || '-';
-  const list = users.data?.filter((u) => !q || `${u.full_name} ${u.email} ${u.employee_code}`.toLowerCase().includes(q.toLowerCase()));
+  const list = users.data?.filter((u) => !q || `${u.full_name} ${u.username} ${u.email} ${u.employee_code}`.toLowerCase().includes(q.toLowerCase()));
 
   const BaseSelect = ({ name = 'base_id', defaultValue, required }) => (
     <select name={name} className="input" defaultValue={defaultValue || ''} required={required}>
@@ -45,18 +45,18 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader title="ผู้ใช้งาน" action={<button type="button" className="btn-primary" onClick={() => open('create')}>+ เพิ่มผู้ใช้</button>} />
-      <input className="input mb-3 max-w-sm" placeholder="ค้นหาชื่อ / อีเมล / รหัส" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="input mb-3 max-w-sm" placeholder="ค้นหาชื่อ / username / รหัส" value={q} onChange={(e) => setQ(e.target.value)} />
       {users.loading && <Spinner />}
       <ErrorBanner message={users.error} onRetry={users.reload} />
       {list && (
         <div className="card overflow-x-auto p-0">
           <table className="table-base">
-            <thead><tr><th>ชื่อ</th><th>อีเมล</th><th>Role</th><th>Base</th><th>สถานะ</th><th /></tr></thead>
+            <thead><tr><th>ชื่อ</th><th>Username</th><th>Role</th><th>Base</th><th>สถานะ</th><th /></tr></thead>
             <tbody>
               {list.map((u) => (
                 <tr key={u.employee_id} className={u.status === 'SUSPENDED' ? 'opacity-50' : ''}>
                   <td>{u.full_name}<br /><span className="text-xs text-slate-400">{u.employee_code} · {u.position}</span></td>
-                  <td>{u.email}</td>
+                  <td className="font-mono text-xs">{u.username || '-'}</td>
                   <td>{ROLE_LABEL[u.role]}{u.role === 'SECRETARY' && <p className="text-xs text-slate-400">scope: {u.team_scope === 'ALL' ? 'ALL' : String(u.team_scope).split(',').filter(Boolean).map(baseName).join(', ') || '-'}</p>}</td>
                   <td>{u.base_name || '-'}</td>
                   <td>{u.status}</td>
@@ -83,8 +83,9 @@ export default function UsersPage() {
           <div className="grid grid-cols-2 gap-3">
             <Field label="ชื่อ-นามสกุล"><input name="full_name" className="input" required /></Field>
             <Field label="รหัสพนักงาน"><input name="employee_code" className="input" /></Field>
-            <Field label="อีเมล"><input name="email" type="email" className="input" required /></Field>
+            <Field label="Username (ใช้ login)" hint="a-z 0-9 . _ - ยาว 3–30 ตัว"><input name="username" className="input font-mono" required pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,29}" autoCapitalize="none" /></Field>
             <Field label="รหัสผ่านเริ่มต้น" hint="อย่างน้อย 8 ตัวอักษร"><input name="password" type="text" minLength={8} className="input" required /></Field>
+            <Field label="อีเมลติดต่อ (ไม่บังคับ)"><input name="email" type="email" className="input" /></Field>
             <Field label="แผนก"><input name="department" className="input" /></Field>
             <Field label="ตำแหน่ง"><input name="position" className="input" /></Field>
             <Field label="Role">
@@ -113,6 +114,7 @@ export default function UsersPage() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="ชื่อ-นามสกุล"><input name="full_name" className="input" defaultValue={modal.user.full_name} /></Field>
               <Field label="รหัสพนักงาน"><input name="employee_code" className="input" defaultValue={modal.user.employee_code} /></Field>
+              <Field label="อีเมลติดต่อ"><input name="email" type="email" className="input" defaultValue={modal.user.email} /></Field>
               <Field label="แผนก"><input name="department" className="input" defaultValue={modal.user.department} /></Field>
               <Field label="ตำแหน่ง"><input name="position" className="input" defaultValue={modal.user.position} /></Field>
               <Field label="Role">

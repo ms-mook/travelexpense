@@ -9,7 +9,7 @@ export const SHEETS = {
     name: '01_users',
     key: 'employee_id',
     columns: ['employee_id', 'auth_user_id', 'employee_code', 'full_name', 'email', 'department', 'position',
-      'role', 'base_id', 'status', 'created_at', 'updated_at']
+      'role', 'base_id', 'status', 'created_at', 'updated_at', 'username']
   },
   bases: {
     name: '02_bases',

@@ -27,7 +27,7 @@ const monthParam = (q) => {
 };
 
 const publicUser = (u) => ({
-  employee_id: u.employee_id, employee_code: u.employee_code, full_name: u.full_name, email: u.email,
+  employee_id: u.employee_id, username: u.username, employee_code: u.employee_code, full_name: u.full_name, email: u.email,
   department: u.department, position: u.position, role: u.role, base_id: u.base_id, status: u.status
 });
 

@@ -101,3 +101,15 @@ test('monthlyAnalysis: ไม่หักยอดเบิกคืนของ
   assert.equal(r.net_employee_burden, 5000);
   assert.equal(r.expense_gap, 2600);
 });
+
+import { isValidUsername, loginIdToAuthEmail, usernameToAuthEmail } from '../shared/username.js';
+
+test('username → อีเมลภายใน และตรวจรูปแบบ', () => {
+  assert.equal(usernameToAuthEmail(' Somchai.K '), 'somchai.k@travelexpense.local');
+  assert.equal(loginIdToAuthEmail('admin@travelexpense.local'), 'admin@travelexpense.local');
+  assert.equal(loginIdToAuthEmail('Admin'), 'admin@travelexpense.local');
+  assert.ok(isValidUsername('se_bkk01'));
+  assert.ok(!isValidUsername('ab'));
+  assert.ok(!isValidUsername('ชื่อไทย'));
+  assert.ok(!isValidUsername('a b c'));
+});

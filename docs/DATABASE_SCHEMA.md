@@ -24,6 +24,7 @@ Primary key: `employee_id`
 | `status` |  |
 | `created_at` |  |
 | `updated_at` |  |
+| `username` | เพิ่มจากแผน v1.0 |
 
 ## 02_bases
 

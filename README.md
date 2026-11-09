@@ -16,6 +16,7 @@
 ### 1. Supabase (Auth อย่างเดียว)
 1. สร้างโปรเจกต์ที่ supabase.com
 2. Authentication → Providers → เปิด Email, **ปิด** "Allow new users to sign up" (ให้ Admin สร้างบัญชีเท่านั้น)
+   ระบบ login ด้วย **username + password** (แปลงเป็นอีเมลภายใน `<username>@travelexpense.local` ไม่มีการส่งอีเมล) — ดู BUSINESS_RULES ข้อ 0
 3. เก็บ `Project URL`, `anon key`, `service_role key`
 
 ### 2. Google Cloud
@@ -29,7 +30,7 @@
 cp .env.example .env    # แล้วกรอกค่า
 npm install
 npm run setup:sheets    # สร้าง 13 Sheets + header + ค่าตั้งต้น
-npm run seed:admin      # สร้าง Super Admin คนแรก
+npm run seed:admin      # สร้าง Super Admin คนแรก (username จาก SEED_ADMIN_USERNAME, ค่าตั้งต้น admin)
 ```
 
 ### 4. รันในเครื่อง
