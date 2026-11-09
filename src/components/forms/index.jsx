@@ -8,6 +8,17 @@ import { EXPENSE_TYPE_LABEL, FUEL_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/l
 
 const formData = (e) => Object.fromEntries(new FormData(e.currentTarget).entries());
 
+const isTrue = (v) => v === true || String(v).toUpperCase() === 'TRUE';
+
+function HomeToggle({ label, active, disabled, onClick }) {
+  return (
+    <button type="button" disabled={disabled} onClick={onClick}
+      className={`rounded-xl px-3 py-2 text-sm ring-1 disabled:opacity-40 ${active ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white text-slate-700 ring-slate-300'}`}>
+      {label}{active ? ' ✓' : ''}
+    </button>
+  );
+}
+
 /** หัวข้อของแต่ละส่วนในฟอร์ม */
 function Section({ n, title, hint, children }) {
   return (
@@ -26,9 +37,12 @@ function Section({ n, title, hint, children }) {
  * ฟอร์มเที่ยวเดินทาง แบ่ง 4 ส่วน: ไปไหน → ไปทำอะไร → ระยะทาง → รถ/อื่น ๆ
  * ประเภท BASE/UPCOUNTRY คำนวณจากจังหวัดปลายทาง (Backend ตรวจซ้ำ)
  */
-export function TripForm({ vehicles, initial = {}, defaultOrigin = '', baseName = '', baseProvinces = '', mapsAvailable = false,
+export function TripForm({ vehicles, initial = {}, defaultOrigin = '', homeLocation = '', isFirstTrip = false, baseName = '', baseProvinces = '', mapsAvailable = false,
   onSubmit, onCancel, busy, error }) {
-  const [origin, setOrigin] = useState(initial.origin ?? defaultOrigin);
+  const startFromHome = initial.trip_id ? isTrue(initial.origin_is_home) : (isFirstTrip && Boolean(homeLocation));
+  const [originHome, setOriginHome] = useState(startFromHome);
+  const [destHome, setDestHome] = useState(isTrue(initial.destination_is_home));
+  const [origin, setOrigin] = useState(initial.origin ?? (startFromHome ? homeLocation : defaultOrigin));
   const [destination, setDestination] = useState(initial.destination || '');
   const [province, setProvince] = useState(initial.destination_province || '');
   const [distance, setDistance] = useState(initial.distance_km ?? '');
@@ -54,6 +68,15 @@ export function TripForm({ vehicles, initial = {}, defaultOrigin = '', baseName 
       onSubmit(body);
     }}>
       <Section n="1" title="ไปไหน" hint="ต้นทางเที่ยวแรกของวันมักเป็นบ้านหรือสำนักงาน เที่ยวถัดไประบบเติมจากปลายทางเที่ยวก่อนให้">
+        <input type="hidden" name="origin_is_home" value={String(originHome)} />
+        <input type="hidden" name="destination_is_home" value={String(destHome)} />
+        <div className="grid grid-cols-2 gap-2">
+          <HomeToggle label="🏠 ออกจากบ้าน" active={originHome} disabled={!homeLocation && !originHome}
+            onClick={() => { const v = !originHome; setOriginHome(v); if (v && homeLocation) setOrigin(homeLocation); }} />
+          <HomeToggle label="🏠 กลับบ้าน" active={destHome} disabled={!homeLocation && !destHome}
+            onClick={() => { const v = !destHome; setDestHome(v); if (v && homeLocation) setDestination(homeLocation); }} />
+        </div>
+        {!homeLocation && <p className="text-xs text-slate-500">ตั้ง “ที่พักอาศัย” ในหน้าโปรไฟล์ เพื่อใช้ปุ่มออกจากบ้าน/กลับบ้าน — ช่วยวัดว่าระยะขาไป-กลับบ้านทำให้เบี้ยเลี้ยงไม่พอแค่ไหน</p>}
         <Field label="ต้นทาง">
           <input name="origin" className="input" required maxLength={200} value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="เช่น สำนักงาน Sysmex ขอนแก่น" />
         </Field>

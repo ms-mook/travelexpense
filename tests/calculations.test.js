@@ -64,8 +64,8 @@ test('computeDailyAllowance ใช้อัตรา Upcountry เมื่อ�
 
 test('computeKmReimbursement ใช้อัตราต่อกม. ตามวันที่ของเที่ยว', () => {
   const r = computeKmReimbursement([
-    { date: '2026-09-30', base_id: 'BKK', distance_km: 100 }, // ก่อนนโยบาย
-    { date: '2026-10-05', base_id: 'BKK', distance_km: 50.5 }
+    { date: '2026-09-30', base_id: 'BKK', travel_type: 'UPCOUNTRY', distance_km: 100 }, // ก่อนนโยบาย
+    { date: '2026-10-05', base_id: 'BKK', travel_type: 'UPCOUNTRY', distance_km: 50.5 }
   ], policies);
   assert.equal(r, 202);
 });
@@ -157,4 +157,49 @@ test('distanceCheck ขึ้นธงเมื่อต่างจาก Googl
   assert.equal(distanceCheck({ distance_km: 130, maps_distance_km: 100 }).flagged, true);
   assert.equal(distanceCheck({ distance_km: 110, maps_distance_km: 100 }).flagged, false);
   assert.equal(distanceCheck({ distance_km: 110, maps_distance_km: '' }), null);
+});
+
+import { baseDayBreakdown, breakEvenKm, bucketByJobs, simulateBasePolicy } from '../server/domain/calculations.js';
+
+test('computeKmReimbursement คิดเฉพาะเที่ยว UPCOUNTRY (4.5 บาท/กม.)', () => {
+  const pol = [{ policy_id: 'k', allowance_type: 'PER_KM_REIMBURSE', allowance_amount: 4.5, base_id: '', effective_from: '2022-01-01', effective_to: '', status: 'ACTIVE' }];
+  const r = computeKmReimbursement([
+    { date: '2026-11-01', base_id: 'B', travel_type: 'UPCOUNTRY', distance_km: 100 },
+    { date: '2026-11-01', base_id: 'B', travel_type: 'BASE', distance_km: 80 }
+  ], pol);
+  assert.equal(r, 450);
+});
+
+test('baseDayBreakdown + bucketByJobs: วันหลายงานต้นทุนสูงกว่า 570', () => {
+  const days = [
+    { date: 'd1', allowance: 570, trips: [{ distance_km: 40, ticket_no: 'A' }], expenses: [] },
+    { date: 'd2', allowance: 570, trips: [
+      { distance_km: 35, origin_is_home: 'TRUE', ticket_no: 'B' }, { distance_km: 30, ticket_no: 'C' },
+      { distance_km: 45, destination_is_home: true }
+    ], expenses: [{ expense_type: 'TOLL', amount: 100 }, { expense_type: 'PARKING', amount: 40 }] },
+    { date: 'd3', allowance: 570, trips: [{ distance_km: 50, job_type: 'PM' }, { distance_km: 50, job_type: 'CORRECTIVE' }, { distance_km: 50, customer_name: 'X' }], expenses: [] }
+  ];
+  const b = baseDayBreakdown({ days, monthlyActualTotal: 0, totalKm: 300, fallbackCostPerKm: 4.5 });
+  assert.equal(b.estimated, true);
+  assert.equal(b.cost_per_km, 4.5);
+  assert.deepEqual(b.days.map((d) => d.jobs), [1, 2, 3]);
+  assert.equal(b.days[1].home_km, 80);
+  assert.equal(b.days[1].cost, 635); // 110 กม. × 4.5 + 140
+  assert.equal(b.days[1].gap, 65);
+  const g = bucketByJobs(b.days);
+  assert.equal(g[0].avg_cost, 180);
+  assert.equal(g[2].days_over_allowance, 1);
+  assert.equal(breakEvenKm(570, 30, 4.5), 120);
+  const real = baseDayBreakdown({ days, monthlyActualTotal: 1500, totalKm: 300 });
+  assert.equal(real.cost_per_km, 5);
+  assert.equal(real.estimated, false);
+});
+
+test('simulateBasePolicy: 570 + 4.5/กม. ที่เกิน 80 กม.', () => {
+  const rows = [{ km: 60, cost: 300 }, { km: 120, cost: 700 }];
+  const cur = simulateBasePolicy(rows, { flat: 570 });
+  assert.equal(cur.short_days, 1);
+  const neu = simulateBasePolicy(rows, { flat: 570, thresholdKm: 80, perKm: 4.5 });
+  assert.equal(neu.company_pay, 1320);
+  assert.equal(neu.short_days, 0); // วันที่ 2 ได้ 570 + 40×4.5 = 750 ≥ 700
 });

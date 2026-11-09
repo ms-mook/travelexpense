@@ -3,6 +3,7 @@ import { api, fetchBlob, qs } from './apiClient';
 
 export const authService = {
   me: () => api('/auth/me'),
+  updateMe: (b) => api('/users/me', { method: 'PATCH', body: b }),
   bases: () => api('/bases')
 };
 

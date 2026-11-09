@@ -11,7 +11,7 @@ export default function RecordDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { features } = useAuth();
+  const { user, features } = useAuth();
   const { data, loading, error, reload } = useAsync(() => tripService.getRecord(id), [id]);
   const vehicles = useAsync(() => vehicleService.list(), []);
   const [tripModal, setTripModal] = useState(null); // { mode: 'new' } | { mode: 'edit', trip }
@@ -113,7 +113,8 @@ export default function RecordDetailPage() {
       <Modal open={Boolean(tripModal)} title={tripModal?.mode === 'edit' ? 'แก้ไขเที่ยว' : 'เพิ่มเที่ยวเดินทาง'} onClose={() => setTripModal(null)}>
         {tripModal && (
           <TripForm vehicles={vehicles.data || []} initial={tripModal.trip} onSubmit={saveTrip}
-            defaultOrigin={lastTrip?.destination || ''} baseName={data.record.base_name_snapshot}
+            defaultOrigin={lastTrip?.destination || ''} homeLocation={user?.home_location || ''} isFirstTrip={!data.trips.length}
+            baseName={data.record.base_name_snapshot}
             baseProvinces={data.base_provinces}
             mapsAvailable={features.maps_distance}
             onCancel={() => setTripModal(null)} busy={act.busy} error={act.error} />

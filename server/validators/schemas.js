@@ -27,6 +27,8 @@ export const tripSchema = {
   customer_name: { type: 'string', max: 200 },
   job_type: { type: 'enum', values: Object.keys(JOB_TYPES) },
   ticket_no: { type: 'string', max: 60 },
+  origin_is_home: { type: 'boolean' },
+  destination_is_home: { type: 'boolean' },
   distance_km: { type: 'number', required: true, min: 0, max: 5000, decimals: 2 },
   odometer_start: { type: 'number', min: 0, decimals: 1 },
   odometer_end: { type: 'number', min: 0, decimals: 1 },
@@ -120,4 +122,8 @@ export const receiptUploadSchema = {
   file_name: { type: 'string', required: true, max: 200 },
   mime_type: { type: 'string', required: true, max: 100 },
   data_base64: { type: 'string', required: true }
+};
+
+export const myProfileSchema = {
+  home_location: { type: 'string', max: 200 } // ที่พักอาศัย / จุดเริ่มต้นปกติ
 };

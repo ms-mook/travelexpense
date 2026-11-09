@@ -77,10 +77,14 @@ export function computeDailyAllowance(days, policies) {
   return { base_days: baseDays, upcountry_days: upDays, amount: round2(amount), lines, missing_policy_days: missing };
 }
 
-/** เงินชดเชยต่อกิโลเมตร (ถ้ามีนโยบาย PER_KM_REIMBURSE) — trips ต้องมี date และ base_id */
+/**
+ * เงินชดเชยต่อกิโลเมตร (นโยบาย PER_KM_REIMBURSE เช่น 4.5 บาท/กม. เบิกผ่าน SAP Concur)
+ * ใช้กับเที่ยว UPCOUNTRY เท่านั้น — เที่ยวในเขต Base ได้เบี้ยเลี้ยงรายวันแทน
+ * trips ต้องมี date และ base_id
+ */
 export function computeKmReimbursement(trips, policies) {
   let amount = 0;
-  for (const t of trips.filter(alive)) {
+  for (const t of trips.filter(alive).filter((x) => x.travel_type === 'UPCOUNTRY')) {
     const p = resolvePolicy(policies, { date: t.date, baseId: t.base_id, type: 'PER_KM_REIMBURSE' });
     if (p) amount += toNumber(t.distance_km) * toNumber(p.allowance_amount);
   }
@@ -182,3 +186,64 @@ export function segmentAnalysis({ trips, expenses, monthlyActualTotal = 0, allow
     }
   };
 }
+
+/**
+ * วิเคราะห์ "วันใน Base" รายวัน — พิสูจน์ว่าวันที่มีหลายงาน / วิ่งไกลจากบ้าน ทำให้ 570 ไม่พอหรือไม่
+ *
+ * ต้นทุนต่อกม. ของพนักงาน = Monthly Actual ÷ Total KM ของเดือน
+ *   (ถ้ายังไม่มี Monthly Actual ที่นับได้ ใช้ fallbackCostPerKm และระบุว่าเป็นค่าประมาณ)
+ * ต้นทุนของวัน = KM ของวัน × ต้นทุนต่อกม. + ค่าใช้จ่ายรายเที่ยวของวัน (ทางด่วน/จอดรถ)
+ * จำนวนงานของวัน = เลขใบงานไม่ซ้ำ → ถ้าไม่มี นับเที่ยวที่ระบุประเภทงาน/ลูกค้า → ถ้าไม่มี นับเที่ยวที่ปลายทางไม่ใช่บ้าน
+ *
+ * days: [{ date, allowance, trips: [...], expenses: [...] }]  (เฉพาะวัน Base)
+ */
+export function baseDayBreakdown({ days, monthlyActualTotal = 0, totalKm = 0, fallbackCostPerKm = 0 }) {
+  const actual = toNumber(monthlyActualTotal);
+  const estimated = !(actual > 0 && totalKm > 0);
+  const costPerKm = estimated ? toNumber(fallbackCostPerKm) : actual / totalKm;
+  const rows = days.map((d) => {
+    const trips = d.trips.filter(alive);
+    const km = trips.reduce((s, t) => s + toNumber(t.distance_km), 0);
+    const homeKm = trips.filter((t) => toBool(t.origin_is_home) || toBool(t.destination_is_home))
+      .reduce((s, t) => s + toNumber(t.distance_km), 0);
+    const tickets = new Set(trips.map((t) => String(t.ticket_no || '').trim()).filter(Boolean));
+    const tagged = trips.filter((t) => t.job_type || t.customer_name).length;
+    const jobs = tickets.size || tagged || trips.filter((t) => !toBool(t.destination_is_home)).length;
+    const tripExpense = summarizeTripExpenses(d.expenses).total;
+    const cost = round2(km * costPerKm + tripExpense);
+    const allowance = toNumber(d.allowance);
+    return {
+      date: d.date, km: round2(km), home_km: round2(homeKm), jobs, trip_expense: tripExpense,
+      cost, allowance, gap: round2(cost - allowance)
+    };
+  });
+  return { cost_per_km: round2(costPerKm), estimated, days: rows };
+}
+
+/** จัดกลุ่มวันตามจำนวนงาน (1 / 2 / 3+) — ใช้ตอบว่าวันหลายงานขาดทุนจริงไหม */
+export function bucketByJobs(dayRows) {
+  const label = (n) => (n >= 3 ? '3+' : String(Math.max(1, n)));
+  const groups = {};
+  for (const d of dayRows) (groups[label(d.jobs)] ||= []).push(d);
+  return ['1', '2', '3+'].map((k) => {
+    const g = groups[k] || [];
+    const avg = (f) => (g.length ? round2(g.reduce((s, d) => s + f(d), 0) / g.length) : 0);
+    return {
+      jobs: k,
+      days: g.length,
+      avg_km: avg((d) => d.km),
+      avg_home_km: avg((d) => d.home_km),
+      avg_cost: avg((d) => d.cost),
+      avg_gap: avg((d) => d.gap),
+      days_over_allowance: g.filter((d) => d.gap > 0).length
+    };
+  });
+}
+
+/** วิ่งเกินกี่ กม./วัน แล้วเบี้ยเลี้ยงไม่พอ = (เบี้ยเลี้ยง − ค่าทางด่วน/จอดเฉลี่ยต่อวัน) ÷ ต้นทุนต่อกม. */
+export function breakEvenKm(allowancePerDay, avgTripExpensePerDay, costPerKm) {
+  if (!(costPerKm > 0)) return null;
+  return round2(Math.max(0, toNumber(allowancePerDay) - toNumber(avgTripExpensePerDay)) / costPerKm);
+}
+
+export { simulateBasePolicy } from '../../shared/policySim.js';

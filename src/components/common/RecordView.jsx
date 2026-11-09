@@ -4,6 +4,8 @@ import { km, money, thaiDate, thaiDateTime } from '../../utils/format';
 import { EXPENSE_TYPE_LABEL, RECEIPT_LABEL, REIMBURSE_LABEL, TRAVEL_TYPE_LABEL } from '../../utils/labels';
 import { JOB_TYPES, googleMapsDirUrl } from '../../../shared/provinces';
 
+const isHome = (v) => v === true || String(v).toUpperCase() === 'TRUE';
+
 /** เทียบระยะที่กรอกกับ Google Maps (ถ้ามี) — ต่างเกิน 20% ขึ้นสีแดง */
 function DistanceCheck({ trip }) {
   const maps = Number(trip.maps_distance_km);
@@ -59,7 +61,7 @@ export default function RecordView({ detail, tripActions, expenseActions, tripFo
                 เที่ยวที่ {t.sequence_no}
                 <span className={`rounded-full px-2 py-0.5 ${t.travel_type === 'BASE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{TRAVEL_TYPE_LABEL[t.travel_type]}</span>
               </p>
-              <p className="font-semibold">{t.origin} → {t.destination}{t.destination_province && <span className="font-normal text-slate-500"> ({t.destination_province})</span>}</p>
+              <p className="font-semibold">{isHome(t.origin_is_home) && '🏠 '}{t.origin} → {isHome(t.destination_is_home) && '🏠 '}{t.destination}{t.destination_province && <span className="font-normal text-slate-500"> ({t.destination_province})</span>}</p>
               {(t.customer_name || t.job_type || t.ticket_no) && (
                 <p className="text-sm text-slate-700">
                   {[t.customer_name, JOB_TYPES[t.job_type], t.ticket_no && `#${t.ticket_no}`].filter(Boolean).join(' · ')}

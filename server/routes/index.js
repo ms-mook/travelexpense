@@ -4,7 +4,8 @@
  */
 import { ROLES } from '../db/schema.js';
 import { badRequest } from '../lib/errors.js';
-import { todayTH } from '../lib/utils.js';
+import { nowIso, todayTH } from '../lib/utils.js';
+import { getDb } from '../db/index.js';
 import { validate } from '../validators/validate.js';
 import * as S from '../validators/schemas.js';
 import * as admin from '../services/adminService.js';
@@ -29,7 +30,8 @@ const monthParam = (q) => {
 
 const publicUser = (u) => ({
   employee_id: u.employee_id, username: u.username, employee_code: u.employee_code, full_name: u.full_name, email: u.email,
-  department: u.department, position: u.position, role: u.role, base_id: u.base_id, status: u.status
+  department: u.department, position: u.position, role: u.role, base_id: u.base_id, status: u.status,
+  home_location: u.home_location || ''
 });
 
 export const routes = [
@@ -49,6 +51,8 @@ export const routes = [
 
   /* ---------- Employee ---------- */
   ['GET', '/users/me', ALL, (ctx) => publicUser(ctx.user)],
+  ['PATCH', '/users/me', ALL, async (ctx, { body }) => publicUser(await getDb().update('users', ctx.user.employee_id,
+    { ...validate(S.myProfileSchema, body, { partial: true }), updated_at: nowIso() }))],
   ['GET', '/me/overview', [E], (ctx, { query }) => reports.myMonthOverview(ctx, monthParam(query))],
   ['GET', '/me/base-history', [E], (ctx) => admin.listAssignments(ctx.user.employee_id)],
 

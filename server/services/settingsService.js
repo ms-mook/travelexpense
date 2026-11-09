@@ -18,6 +18,7 @@ export async function getTypedSettings() {
     maxReceiptBytes: Number(s.MAX_RECEIPT_SIZE_MB || 3) * 1024 * 1024,
     allowedReceiptTypes: String(s.ALLOWED_RECEIPT_TYPES).split(',').map((x) => x.trim()),
     reportStatuses: String(s.REPORT_STATUSES || 'VERIFIED').split(',').map((x) => x.trim()),
-    includeTripExpensesInActual: toBool(s.INCLUDE_TRIP_EXPENSES_IN_ACTUAL ?? 'TRUE')
+    includeTripExpensesInActual: toBool(s.INCLUDE_TRIP_EXPENSES_IN_ACTUAL ?? 'TRUE'),
+    fallbackCostPerKm: Number(s.FALLBACK_COST_PER_KM || 4.5)
   };
 }

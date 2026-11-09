@@ -28,6 +28,7 @@
 | GET | `/bases` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
 | GET | `/maps/distance` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
 | GET | `/users/me` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
+| PATCH | `/users/me` | EMPLOYEE, SECRETARY, MANAGEMENT, SUPER_ADMIN |
 | GET | `/me/overview` | EMPLOYEE |
 | GET | `/me/base-history` | EMPLOYEE |
 | GET | `/vehicles` | EMPLOYEE |

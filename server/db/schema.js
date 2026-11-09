@@ -9,7 +9,7 @@ export const SHEETS = {
     name: '01_users',
     key: 'employee_id',
     columns: ['employee_id', 'auth_user_id', 'employee_code', 'full_name', 'email', 'department', 'position',
-      'role', 'base_id', 'status', 'created_at', 'updated_at', 'username']
+      'role', 'base_id', 'status', 'created_at', 'updated_at', 'username', 'home_location']
   },
   bases: {
     name: '02_bases',
@@ -41,7 +41,8 @@ export const SHEETS = {
     columns: ['trip_id', 'daily_record_id', 'employee_id', 'vehicle_id', 'vehicle_model_snapshot',
       'license_plate_snapshot', 'fuel_type_snapshot', 'sequence_no', 'travel_type', 'origin', 'destination',
       'distance_km', 'odometer_start', 'odometer_end', 'note', 'created_at', 'updated_at', 'is_deleted',
-      'destination_province', 'customer_name', 'job_type', 'ticket_no', 'maps_distance_km']
+      'destination_province', 'customer_name', 'job_type', 'ticket_no', 'maps_distance_km',
+      'origin_is_home', 'destination_is_home']
   },
   expenses: {
     name: '07_expenses',
@@ -118,5 +119,6 @@ export const DEFAULT_SETTINGS = [
   ['MONTHLY_CLOSING_DAY', '5', 'วันที่ปิดรอบของเดือนถัดไป'],
   ['REPORT_STATUSES', 'VERIFIED', 'สถานะที่นับในรายงานผู้บริหาร (คั่นด้วย ,)'],
   ['INCLUDE_TRIP_EXPENSES_IN_ACTUAL', 'TRUE', 'รวมค่าทางด่วน/จอดรถ/อื่น ๆ รายเที่ยวใน Actual Operating Cost หรือไม่'],
+  ['FALLBACK_COST_PER_KM', '4.5', 'ต้นทุนต่อกม. (บาท) ที่ใช้ประมาณการรายวัน เมื่อพนักงานยังไม่ส่ง/ยังไม่ยืนยันค่าใช้จ่ายรายเดือน'],
   ['ALLOWANCE_DAY_RULE', 'UPCOUNTRY_IF_ANY', 'วิธีจัดประเภทวันสำหรับเบี้ยเลี้ยง: UPCOUNTRY_IF_ANY = วันที่มีเที่ยว Upcountry อย่างน้อย 1 เที่ยวใช้อัตรา Upcountry']
 ];

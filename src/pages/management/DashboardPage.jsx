@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { simulateBasePolicy } from '../../../shared/policySim';
 import { ErrorBanner, PageHeader, Spinner, StatCard } from '../../components/common';
 import CompareChart from '../../components/dashboard/CompareChart';
 import { useAction, useAsync } from '../../hooks/useAsync';
 import { reportService } from '../../services';
-import { downloadBlob, km, money, thaiMonth, thisMonth } from '../../utils/format';
+import { downloadBlob, km, money, num2, thaiMonth, thisMonth } from '../../utils/format';
 
 const gapTone = (v) => (v > 0 ? 'text-rose-600' : 'text-emerald-700');
 
@@ -48,6 +49,8 @@ export default function DashboardPage() {
           </div>
 
           <BaseAllowanceSection t={t} employees={cur.employees} />
+
+          <BaseDaysSection a={cur.base_day_analysis} />
 
           <div className="card text-xs text-slate-600">
             <p className="font-semibold text-slate-700">สูตรที่ใช้</p>
@@ -164,6 +167,77 @@ function BaseAllowanceSection({ t, employees }) {
         </div>
       )}
       <p className="text-xs text-slate-400">* ค่าน้ำมัน/บำรุงรักษา/สึกหรอรายเดือนปันส่วนตามกิโลเมตร — ตัวเลขแม่นขึ้นเมื่อพนักงานบันทึกครบทุกเที่ยวและส่งค่าใช้จ่ายรายเดือน</p>
+    </div>
+  );
+}
+
+/**
+ * วันใน Base รายวัน: วันที่มีหลายงาน / วิ่งไกลจากบ้าน ทำให้ 570 ไม่พอจริงไหม + จำลองนโยบายใหม่
+ * (เลือก Base “Bangkok & Metro” ที่ตัวกรองด้านบนเพื่อดูเฉพาะกรุงเทพฯ+ปริมณฑล)
+ */
+function BaseDaysSection({ a }) {
+  const [sim, setSim] = useState({ flat: Math.round(a?.avg_allowance_per_day || 570), thresholdKm: 80, perKm: 4.5 });
+  const current = useMemo(() => simulateBasePolicy(a?.day_rows || [], { flat: a?.avg_allowance_per_day || 570 }), [a]);
+  const proposed = useMemo(() => simulateBasePolicy(a?.day_rows || [], sim), [a, sim]);
+  if (!a || !a.days) {
+    return <div className="card text-sm text-slate-500">ยังไม่มีวันใน Base ที่ยืนยันแล้วในเดือนนี้ — เมื่อมีข้อมูล ส่วนนี้จะแสดงต้นทุนรายวันแยกตามจำนวนงาน</div>;
+  }
+  const set = (k) => (e) => setSim((s) => ({ ...s, [k]: Number(e.target.value) }));
+  const extra = proposed.company_pay - current.company_pay;
+  return (
+    <div className="card space-y-4">
+      <div>
+        <p className="text-lg font-bold">วันที่มีหลายงาน ทำให้เบี้ยเลี้ยงไม่พอจริงไหม?</p>
+        <p className="text-sm text-slate-500">
+          ดูรายวัน {a.days} วัน · ต้นทุนเฉลี่ย {money(a.avg_cost_per_km)}/กม.
+          {a.estimated_employees > 0 && <span className="text-amber-700"> · {a.estimated_employees} คนยังไม่ส่งค่าใช้จ่ายรายเดือน ใช้ค่าประมาณจากตั้งค่า FALLBACK_COST_PER_KM</span>}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="จุดคุ้มทุน" value={a.break_even_km !== null ? `${num2(a.break_even_km)} กม./วัน` : '-'} tone="brand"
+          hint={`วิ่งเกินนี้ ${money(a.avg_allowance_per_day)} ไม่พอ (หักทางด่วน/จอดเฉลี่ย ${money(a.avg_trip_expense_per_day)} แล้ว)`} />
+        <StatCard label="วันที่ต้นทุนเกินเบี้ยเลี้ยง" value={`${a.days_over_allowance} / ${a.days} วัน`} tone={a.days_over_allowance ? 'rose' : 'emerald'}
+          hint={`${a.days ? Math.round((a.days_over_allowance / a.days) * 100) : 0}% ของวันใน Base`} />
+        <StatCard label="สัดส่วน กม. ขาไป-กลับบ้าน" value={`${num2(a.avg_home_km_share)}%`}
+          hint="จากเที่ยวที่กด “ออกจากบ้าน / กลับบ้าน”" />
+        <StatCard label="ต้นทุนเฉลี่ย / กม." value={money(a.avg_cost_per_km)} hint="จากค่าใช้จ่ายจริงรายเดือน ÷ กม. รวม" />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="table-base">
+          <thead><tr><th>งานต่อวัน</th><th className="text-right">จำนวนวัน</th><th className="text-right">กม. เฉลี่ย/วัน</th><th className="text-right">กม. ขาบ้าน</th><th className="text-right">ต้นทุนเฉลี่ย/วัน</th><th className="text-right">ส่วนต่างเฉลี่ย/วัน</th><th className="text-right">วันที่ขาดทุน</th></tr></thead>
+          <tbody>
+            {a.buckets.map((b) => (
+              <tr key={b.jobs}>
+                <td className="font-semibold">{b.jobs} งาน</td>
+                <td className="text-right">{b.days}</td>
+                <td className="text-right tabular-nums">{num2(b.avg_km)}</td>
+                <td className="text-right tabular-nums">{num2(b.avg_home_km)}</td>
+                <td className="text-right tabular-nums">{money(b.avg_cost)}</td>
+                <td className={`text-right font-semibold tabular-nums ${gapTone(b.avg_gap)}`}>{money(b.avg_gap)}</td>
+                <td className="text-right">{b.days_over_allowance} / {b.days}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+        <p className="font-semibold">ลองปรับนโยบาย (จำลองจากข้อมูลจริงเดือนนี้)</p>
+        <p className="mb-3 text-xs text-slate-500">เบี้ยเลี้ยงต่อวัน = เหมาจ่าย + อัตราต่อกม. × (กม. ของวัน − กม. ที่รวมในเหมาจ่าย)</p>
+        <div className="grid grid-cols-3 gap-3">
+          <label className="text-sm"><span className="label">เหมาจ่าย/วัน (บาท)</span><input type="number" min="0" step="10" className="input" value={sim.flat} onChange={set('flat')} /></label>
+          <label className="text-sm"><span className="label">กม. ที่รวมในเหมาจ่าย</span><input type="number" min="0" step="5" className="input" value={sim.thresholdKm} onChange={set('thresholdKm')} /></label>
+          <label className="text-sm"><span className="label">บาท / กม. ส่วนเกิน</span><input type="number" min="0" step="0.5" className="input" value={sim.perKm} onChange={set('perKm')} /></label>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="บริษัทจ่าย (ปัจจุบัน → ใหม่)" value={`${money(current.company_pay)} → ${money(proposed.company_pay)}`} />
+          <StatCard label="บริษัทจ่ายเพิ่ม / เดือน" value={money(extra)} tone={extra > 0 ? 'amber' : 'emerald'} hint={`≈ ${money(extra * 12)} / ปี (ถ้าทุกเดือนเหมือนเดือนนี้)`} />
+          <StatCard label="วันที่ยังขาดทุน" value={`${current.short_days} → ${proposed.short_days} วัน`} tone={proposed.short_days ? 'rose' : 'emerald'} />
+          <StatCard label="ส่วนต่างรวมของพนักงาน" value={`${money(current.gap)} → ${money(proposed.gap)}`} tone={proposed.gap > 0 ? 'rose' : 'emerald'} />
+        </div>
+      </div>
     </div>
   );
 }

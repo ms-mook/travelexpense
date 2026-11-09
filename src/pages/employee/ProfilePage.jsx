@@ -9,7 +9,7 @@ import { thaiDate } from '../../utils/format';
 import { FUEL_LABEL, ROLE_LABEL } from '../../utils/labels';
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, reload } = useAuth();
   const vehicles = useAsync(() => vehicleService.list(true), []);
   const history = useAsync(() => tripService.baseHistory(), []);
   const bases = useAsync(() => authService.bases(), []);
@@ -34,6 +34,19 @@ export default function ProfilePage() {
           <dt className="text-slate-500">Base ปัจจุบัน</dt><dd className="font-semibold">{user.base_name || '-'}</dd>
         </dl>
       </div>
+
+      <form className="card space-y-2" onSubmit={async (e) => {
+        e.preventDefault();
+        const home = new FormData(e.currentTarget).get('home_location');
+        if (await act.run(() => authService.updateMe({ home_location: home }))) reload();
+      }}>
+        <h2 className="font-bold">ที่พักอาศัย (จุดเริ่มต้นปกติ)</h2>
+        <p className="text-xs text-slate-500">ใช้กับปุ่ม “ออกจากบ้าน / กลับบ้าน” ตอนบันทึกเที่ยว และใช้วิเคราะห์ระยะขาไป-กลับบ้าน (ใส่แค่ย่าน/เขตก็พอ ไม่ต้องใส่เลขที่บ้าน)</p>
+        <div className="flex gap-2">
+          <input name="home_location" className="input" defaultValue={user.home_location} placeholder="เช่น บางบัวทอง นนทบุรี" maxLength={200} />
+          <button type="submit" className="btn-secondary shrink-0" disabled={act.busy}>บันทึก</button>
+        </div>
+      </form>
 
       <section>
         <div className="mb-2 flex items-center justify-between">

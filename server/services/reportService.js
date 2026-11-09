@@ -4,7 +4,7 @@
  */
 import { getDb } from '../db/index.js';
 import {
-  computeDailyAllowance, computeKmReimbursement, monthlyAnalysis, segmentAnalysis, summarizeDistance, summarizeTripExpenses
+  baseDayBreakdown, breakEvenKm, bucketByJobs, computeDailyAllowance, computeKmReimbursement, monthlyAnalysis, segmentAnalysis, summarizeDistance, summarizeTripExpenses
 } from '../domain/calculations.js';
 import { round2, toBool } from '../lib/utils.js';
 import { baseForDate } from './adminService.js';
@@ -60,6 +60,21 @@ function employeeMonth(data, user, month) {
     allowanceLines: allowance.lines, kmReimbursement
   });
 
+  // วิเคราะห์วันใน Base รายวัน
+  const baseDates = new Map(allowance.lines.filter((l) => l.type === 'DAILY_BASE').map((l) => [l.date, l.rate]));
+  const baseRecs = recs.filter((r) => baseDates.has(r.record_date));
+  const baseDaily = baseDayBreakdown({
+    days: baseRecs.map((r) => ({
+      date: r.record_date,
+      allowance: baseDates.get(r.record_date),
+      trips: myTrips.filter((t) => t.daily_record_id === r.daily_record_id),
+      expenses: myExpenses.filter((e) => e.daily_record_id === r.daily_record_id)
+    })),
+    monthlyActualTotal: actualCounted ? actual.actual_total : 0,
+    totalKm: distance.total_km,
+    fallbackCostPerKm: settings.fallbackCostPerKm
+  });
+
   // งานที่ได้: นับจากเที่ยวที่ระบุประเภทงาน/เลขใบงาน
   const jobTrips = myTrips.filter((t) => t.job_type || t.ticket_no);
   const tickets = new Set(myTrips.map((t) => String(t.ticket_no || '').trim()).filter(Boolean));
@@ -96,6 +111,7 @@ function employeeMonth(data, user, month) {
     ...analysis,
     segments,
     jobs,
+    base_daily: baseDaily,
     data_quality: {
       monthly_actual_missing: !actual,
       monthly_actual_not_counted: Boolean(actual && !actualCounted),
@@ -152,8 +168,29 @@ export async function monthlySummary({ month, baseId, employeeId }, preloaded) {
     return acc;
   }, {})).map(({ rows: rs, ...b }) => ({ ...b, ...aggregate(rs) }));
 
+  // รวมวันใน Base ของทุกคน → กลุ่มตามจำนวนงาน, จุดคุ้มทุน, ข้อมูลสำหรับจำลองนโยบาย
+  const dayRows = rows.flatMap((r) => r.base_daily.days.map((d) => ({ ...d, employee_id: r.employee_id, base_id: r.base_id })));
+  const totalKmAll = dayRows.reduce((s, d) => s + d.km, 0);
+  const costKmAll = dayRows.reduce((s, d) => s + (d.cost - d.trip_expense), 0);
+  const avgCostPerKm = totalKmAll ? costKmAll / totalKmAll : data.settings.fallbackCostPerKm;
+  const avgTripExp = dayRows.length ? dayRows.reduce((s, d) => s + d.trip_expense, 0) / dayRows.length : 0;
+  const avgAllowance = dayRows.length ? dayRows.reduce((s, d) => s + d.allowance, 0) / dayRows.length : 0;
+  const baseDayAnalysis = {
+    days: dayRows.length,
+    estimated_employees: rows.filter((r) => r.base_daily.days.length && r.base_daily.estimated).length,
+    avg_cost_per_km: round2(avgCostPerKm),
+    avg_trip_expense_per_day: round2(avgTripExp),
+    avg_allowance_per_day: round2(avgAllowance),
+    break_even_km: breakEvenKm(avgAllowance, avgTripExp, avgCostPerKm),
+    days_over_allowance: dayRows.filter((d) => d.gap > 0).length,
+    avg_home_km_share: totalKmAll ? round2((dayRows.reduce((s, d) => s + d.home_km, 0) / totalKmAll) * 100) : 0,
+    buckets: bucketByJobs(dayRows),
+    day_rows: dayRows.map(({ km, cost, jobs, gap, base_id: b }) => ({ km, cost, jobs, gap, base_id: b }))
+  };
+
   return {
     month,
+    base_day_analysis: baseDayAnalysis,
     report_statuses: data.settings.reportStatuses,
     include_trip_expenses_in_actual: data.settings.includeTripExpensesInActual,
     totals: aggregate(rows),

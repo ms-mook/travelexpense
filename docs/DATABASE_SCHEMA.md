@@ -25,6 +25,7 @@ Primary key: `employee_id`
 | `created_at` |  |
 | `updated_at` |  |
 | `username` | เพิ่มจากแผน v1.0 |
+| `home_location` | เพิ่มจากแผน v1.0 |
 
 ## 02_bases
 
@@ -124,6 +125,8 @@ Primary key: `trip_id`
 | `job_type` | เพิ่มจากแผน v1.0 |
 | `ticket_no` | เพิ่มจากแผน v1.0 |
 | `maps_distance_km` | เพิ่มจากแผน v1.0 |
+| `origin_is_home` | เพิ่มจากแผน v1.0 |
+| `destination_is_home` | เพิ่มจากแผน v1.0 |
 
 ## 07_expenses
 
